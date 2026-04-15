@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>화면명 — 와이어프레임</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,sans-serif}
+  body{background:#e8e8e8;display:flex;flex-direction:column;align-items:center;padding:24px;gap:12px}
+  h1{font-size:14px;color:#666}
+  .device{width:375px;background:#fff;border-radius:40px;box-shadow:0 0 0 10px #1a1a1a,0 20px 60px rgba(0,0,0,.3);overflow:hidden}
+  .status{height:44px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px;font-size:13px;font-weight:600}
+  .nav{height:56px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;padding:0 16px;gap:12px}
+  .nav-title{font-size:17px;font-weight:600;flex:1;text-align:center}
+  .nav-btn{font-size:17px;color:#007AFF;cursor:pointer;min-width:44px}
+  .content{padding:16px;min-height:580px}
+  .btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:17px;font-weight:600;cursor:pointer;margin-bottom:8px}
+  .btn-primary{background:#007AFF;color:#fff}
+  .input{width:100%;padding:12px 14px;border:1px solid #e0e0e0;border-radius:10px;font-size:16px;margin-bottom:8px}
+  .tab-bar{height:83px;border-top:1px solid #e8e8e8;display:flex;background:#fff;padding:8px 0 20px}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;color:#8e8e93;cursor:pointer}
+  .tab.active{color:#007AFF}
+  .tab-icon{font-size:22px}
+  .annotation{background:#fff9e6;border:1px dashed #f0c040;border-radius:8px;padding:10px;font-size:12px;color:#856404;margin:8px 0}
+</style>
+</head>
+<body>
+<h1>화면명 — 와이어프레임</h1>
+<div class="device">
+  <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+  <div class="nav">
+    <span class="nav-btn">‹</span>
+    <span class="nav-title">화면 제목</span>
+    <span class="nav-btn" style="text-align:right"></span>
+  </div>
+  <div class="content">
+    <div class="annotation">💡 여기에 컴포넌트를 배치하세요</div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab active"><span class="tab-icon">🏠</span><span>홈</span></div>
+    <div class="tab"><span class="tab-icon">🔍</span><span>탐색</span></div>
+    <div class="tab"><span class="tab-icon">❤️</span><span>저장</span></div>
+    <div class="tab"><span class="tab-icon">👤</span><span>마이</span></div>
+  </div>
+</div>
+</body>
+</html>

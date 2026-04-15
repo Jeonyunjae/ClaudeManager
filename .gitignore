@@ -1,0 +1,11 @@
+.DS_Store
+.obsidian/
+*.log
+node_modules/
+.env
+.env.local
+.env.production
+.next/
+.claude/
+.rollback_backup/
+data/

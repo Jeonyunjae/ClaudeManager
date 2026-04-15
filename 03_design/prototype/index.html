@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClaudeManager UI Prototype</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50:'#F5F0FF',100:'#EDE5FF',200:'#D4C4FF',300:'#B49AFF',400:'#9B7AFF',500:'#7C5CFC',600:'#6344E0',700:'#4D30C0' },
+            secondary: { 50:'#F0FDF9',100:'#D9FBF0',300:'#7EDCBB',500:'#3EC9A0',600:'#2DAD87' },
+            status: { active:'#5B9BF7', pending:'#F5A623', error:'#F06060', complete:'#4ADE80', idle:'#A0AEC0', stopped:'#E2E8F0' },
+            bg: { base:'#FDFBF7', surface:'#FFFFFF', sidebar:'#F8F5F0', chat:'#FAF8F5', scene:'#F5EDE3' },
+            txt: { primary:'#1A1523', secondary:'#6B6478', tertiary:'#9E96AB' },
+            part: { project:'#7C5CFC', finance:'#F5A623', daily:'#3EC9A0', blue:'#5B9BF7', coral:'#F78B8B' }
+          },
+          fontFamily: { sans: ['Inter', 'Pretendard', '-apple-system', 'sans-serif'], mono: ['JetBrains Mono', 'Menlo', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: #FDFBF7; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    @keyframes typing { 0%,60%,100%{opacity:.3} 30%{opacity:1} }
+    .typing-dot { animation: typing 1.4s infinite; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    .proto-nav { position:fixed; top:0; left:0; right:0; z-index:100; background:#1A1523; color:white; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+    .float-anim { animation: float 3s ease-in-out infinite; }
+    @keyframes walk { 0%{transform:translateX(0)} 50%{transform:translateX(8px)} 100%{transform:translateX(0)} }
+    .walk-anim { animation: walk 1.5s ease-in-out infinite; }
+    @keyframes pulse-glow { 0%,100%{box-shadow:0 0 8px rgba(124,92,252,0.3)} 50%{box-shadow:0 0 20px rgba(124,92,252,0.6)} }
+    .pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+    .top-nav-tab { cursor:pointer; padding:12px 16px; font-size:14px; font-weight:500; color:#6B6478; border-bottom:2px solid transparent; transition:all 0.2s; }
+    .top-nav-tab:hover { color:#7C5CFC; }
+    .top-nav-tab.active { color:#7C5CFC; border-bottom-color:#7C5CFC; }
+  </style>
+</head>
+<body class="font-sans text-txt-primary">
+
+<!-- Prototype Navigation (개발용) -->
+<div class="proto-nav flex items-center gap-1 px-4 py-2 text-sm overflow-x-auto whitespace-nowrap">
+  <span class="text-primary-300 font-semibold mr-3">ClaudeManager Prototype</span>
+  <button onclick="showScreen('login')" class="px-3 py-1 rounded-full hover:bg-white/10 transition" data-screen="login">로그인</button>
+  <button onclick="showScreen('workspace')" class="px-3 py-1 rounded-full hover:bg-white/10 transition" data-screen="workspace">워크스페이스</button>
+  <button onclick="showScreen('chat-popup')" class="px-3 py-1 rounded-full hover:bg-white/10 transition" data-screen="chat-popup">채팅 팝업</button>
+  <button onclick="showScreen('approval-popup')" class="px-3 py-1 rounded-full hover:bg-white/10 transition" data-screen="approval-popup">승인 접촉</button>
+  <button onclick="showScreen('dashboard')" class="px-3 py-1 rounded-full hover:bg-white/10 transition" data-screen="dashboard">대시보드</button>
+  <button onclick="showScreen('settings')" class="px-3 py-1 rounded-full hover:bg-white/10 transition" data-screen="settings">설정</button>
+  <button onclick="showScreen('resources')" class="px-3 py-1 rounded-full hover:bg-white/10 transition" data-screen="resources">리소스 관리</button>
+  <button onclick="showScreen('agent-modal')" class="px-3 py-1 rounded-full hover:bg-white/10 transition" data-screen="agent-modal">에이전트 모달</button>
+  <button onclick="showScreen('mobile-chat')" class="px-3 py-1 rounded-full hover:bg-white/10 transition" data-screen="mobile-chat">모바일 채팅</button>
+  <button onclick="showScreen('mobile-status')" class="px-3 py-1 rounded-full hover:bg-white/10 transition" data-screen="mobile-status">모바일 상태</button>
+</div>
+
+<div class="pt-12">
+
+<!-- ==================== 1. LOGIN ==================== -->
+<div id="screen-login" class="screen active">
+  <div class="min-h-screen flex items-center justify-center" style="background: linear-gradient(135deg, #FDFBF7 0%, #F5EDE3 50%, #EDE5FF 100%);">
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+      <div class="absolute top-20 left-20 w-64 h-64 rounded-full bg-primary-200/30 blur-3xl"></div>
+      <div class="absolute bottom-32 right-32 w-48 h-48 rounded-full bg-secondary-100/40 blur-3xl"></div>
+      <div class="absolute top-1/2 left-1/2 w-96 h-96 rounded-full bg-primary-100/20 blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+    </div>
+    <div class="relative bg-white rounded-2xl shadow-xl p-10 w-full max-w-md fade-in">
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 bg-primary-500 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 12h6M12 9v6"/></svg>
+        </div>
+        <h1 class="text-2xl font-bold text-txt-primary">ClaudeManager</h1>
+        <p class="text-sm text-txt-secondary mt-1">나와 AI 동료들이 함께하는 워크스페이스</p>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-txt-secondary mb-1.5">비밀번호</label>
+          <input type="password" placeholder="비밀번호를 입력하세요" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition text-sm" value="********">
+        </div>
+        <button class="w-full py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-semibold rounded-lg hover:from-primary-600 hover:to-primary-700 transition shadow-lg shadow-primary-200">
+          로그인
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 2. WORKSPACE ==================== -->
+<div id="screen-workspace" class="screen">
+  <div class="min-h-screen bg-bg-base">
+    <!-- Top Navigation (상단 메뉴) -->
+    <div class="bg-white border-b border-gray-100 px-6 flex items-center justify-between">
+      <div class="flex items-center gap-1">
+        <div class="flex items-center gap-2 mr-6">
+          <div class="w-7 h-7 bg-primary-500 rounded-lg flex items-center justify-center">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 12h6M12 9v6"/></svg>
+          </div>
+          <span class="font-semibold text-sm">ClaudeManager</span>
+        </div>
+        <button class="top-nav-tab active">워크스페이스</button>
+        <button class="top-nav-tab">대시보드</button>
+        <button class="top-nav-tab">설정</button>
+        <button class="top-nav-tab">리소스 관리</button>
+      </div>
+      <div class="flex items-center gap-3">
+        <button class="relative p-2 text-txt-secondary hover:text-primary-500 transition">
+          <i data-lucide="bell" class="w-5 h-5"></i>
+          <span class="absolute -top-0.5 -right-0.5 w-4 h-4 bg-status-error text-white text-[10px] font-bold rounded-full flex items-center justify-center">2</span>
+        </button>
+      </div>
+    </div>
+    <!-- Part tabs -->
+    <div class="bg-white border-b border-gray-100 px-6 py-2 flex items-center gap-2">
+      <button class="px-4 py-1.5 text-sm font-medium bg-primary-50 text-primary-500 rounded-full border border-primary-200">전체</button>
+      <button class="px-4 py-1.5 text-sm font-medium text-txt-secondary rounded-full hover:bg-gray-50">프로젝트관리부</button>
+      <button class="px-4 py-1.5 text-sm font-medium text-txt-secondary rounded-full hover:bg-gray-50">재무관리부</button>
+    </div>
+    <!-- 3D Workspace -->
+    <div class="relative" style="height: calc(100vh - 150px); background: linear-gradient(180deg, #F5EDE3 0%, #FAF0E6 100%);">
+      <div class="absolute inset-0 flex items-center justify-center">
+        <div class="text-center">
+          <!-- Shared Workspace: My Avatar + Main side by side -->
+          <div class="flex gap-8 items-end justify-center mb-10">
+            <!-- My Avatar (movable) -->
+            <div class="relative inline-block float-anim cursor-pointer group" style="animation-delay: 0s;">
+              <div class="bg-white/80 backdrop-blur rounded-2xl px-8 py-5 shadow-lg border-2 border-primary-200 group-hover:border-primary-400 transition">
+                <div class="text-4xl mb-2">🧑</div>
+                <div class="text-sm font-semibold text-primary-600">나</div>
+                <div class="text-[10px] text-txt-tertiary mt-0.5">WASD/클릭으로 이동</div>
+              </div>
+              <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-primary-500 font-medium whitespace-nowrap">↑↓←→ 이동하여 접촉</div>
+            </div>
+            <!-- Main Character (approachable) -->
+            <div class="relative inline-block float-anim cursor-pointer group" style="animation-delay: 0.5s;" title="Main에 접촉하면 채팅 팝업이 열립니다">
+              <div class="bg-primary-50 border-2 border-primary-200 rounded-2xl px-8 py-5 shadow-md group-hover:pulse-glow transition">
+                <div class="text-4xl mb-2">🧑‍💼</div>
+                <div class="text-sm font-semibold text-primary-600">Main (비서실장)</div>
+                <div class="text-[10px] text-txt-tertiary mt-0.5">접촉 → 채팅 팝업</div>
+                <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-white px-3 py-1 rounded-full shadow text-xs text-txt-primary whitespace-nowrap">"오늘 현황 정리했어요!"</div>
+              </div>
+            </div>
+          </div>
+          <!-- Departments -->
+          <div class="flex gap-6 justify-center">
+            <div class="bg-white/70 backdrop-blur rounded-xl p-6 shadow-md border border-primary-100 w-64 cursor-pointer hover:shadow-lg transition" title="접촉하면 상세 팝업이 열립니다">
+              <div class="text-xs font-bold text-primary-500 mb-3 flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-primary-500"></span> 프로젝트관리부
+              </div>
+              <div class="flex gap-3 mb-3">
+                <div class="text-center"><div class="text-2xl mb-1">👨‍💻</div><div class="text-[10px] text-txt-secondary">부서장</div></div>
+              </div>
+              <div class="bg-primary-50 rounded-lg p-3">
+                <div class="text-xs font-medium mb-1">할일관리앱 팀</div>
+                <div class="flex gap-2 items-center">
+                  <span class="text-lg">👩‍💻</span><span class="text-lg">👨‍🔧</span><span class="text-lg">👩‍🎨</span>
+                </div>
+                <div class="mt-2 flex items-center gap-2">
+                  <div class="flex-1 h-1.5 bg-primary-100 rounded-full overflow-hidden"><div class="w-3/5 h-full bg-status-active rounded-full"></div></div>
+                  <span class="text-[10px] text-status-active font-medium">개발 60%</span>
+                </div>
+                <div class="mt-1 bg-white rounded px-2 py-0.5 text-[10px] text-txt-secondary inline-block">"개발 중..."</div>
+              </div>
+            </div>
+            <div class="bg-white/70 backdrop-blur rounded-xl p-6 shadow-md border border-part-finance/30 w-64 cursor-pointer hover:shadow-lg transition">
+              <div class="text-xs font-bold text-part-finance mb-3 flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-part-finance"></span> 재무관리부
+              </div>
+              <div class="flex gap-3 mb-3">
+                <div class="text-center"><div class="text-2xl mb-1">👩‍💼</div><div class="text-[10px] text-txt-secondary">부서장</div></div>
+              </div>
+              <div class="bg-orange-50 rounded-lg p-3">
+                <div class="text-xs font-medium mb-1">월간분석 팀</div>
+                <div class="flex gap-2 items-center"><span class="text-lg">👨‍💻</span></div>
+                <div class="mt-1 bg-white rounded px-2 py-0.5 text-[10px] text-status-complete inline-block">"분석 완료"</div>
+              </div>
+            </div>
+            <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 w-64 flex items-center justify-center">
+              <div class="text-center text-txt-tertiary"><div class="text-3xl mb-2">+</div><div class="text-xs">새 부서 공간</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Interaction hint -->
+      <div class="absolute top-4 left-4 bg-primary-50 border border-primary-200 rounded-lg px-4 py-3 text-xs shadow fade-in space-y-1">
+        <div class="font-semibold text-primary-600 mb-1">상호작용 안내</div>
+        <div class="text-txt-secondary">🧑→🧑‍💼 <strong>내가 다가감</strong>: 상태 확인, 대화, 로그 열람</div>
+        <div class="text-txt-secondary">🧑‍💼→🧑 <strong>에이전트가 다가옴</strong>: 승인 요청, 리포트, 알림</div>
+      </div>
+      <div class="absolute top-4 right-4 bg-white/80 backdrop-blur rounded-lg px-3 py-2 text-xs text-txt-secondary shadow">
+        * 실제 구현 시 Three.js 3D 렌더링 (캐릭터 이동 + 접촉)
+      </div>
+    </div>
+    <!-- Bottom status bar -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-2 flex items-center justify-between text-xs text-txt-secondary">
+      <span>에이전트: <strong class="text-txt-primary">6/10</strong></span>
+      <span>비용: <strong class="text-txt-primary">$78.00</strong></span>
+      <span class="flex items-center gap-1">헬스: <span class="w-2 h-2 rounded-full bg-status-complete"></span> 정상</span>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 3. CHAT POPUP (Main 접촉 시) ==================== -->
+<div id="screen-chat-popup" class="screen">
+  <div class="min-h-screen bg-bg-base relative">
+    <!-- Background workspace (dimmed) -->
+    <div class="absolute inset-0 bg-bg-scene opacity-30"></div>
+    <div class="fixed inset-0 bg-black/30 z-40"></div>
+    <!-- Chat popup modal -->
+    <div class="fixed inset-x-8 top-[8%] bottom-[8%] bg-white rounded-2xl z-50 flex flex-col shadow-2xl fade-in" style="max-width:700px; margin:0 auto;">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+        <div class="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold text-sm">M</div>
+        <div class="flex-1">
+          <div class="font-semibold text-sm">비서실장</div>
+          <div class="flex items-center gap-1 text-xs text-txt-secondary"><span class="w-1.5 h-1.5 rounded-full bg-status-complete"></span> 연결됨</div>
+        </div>
+        <span class="text-[10px] text-txt-tertiary bg-primary-50 px-2 py-1 rounded-full">Main에 접촉하여 열림</span>
+        <button class="p-2 text-txt-tertiary hover:text-txt-primary rounded-lg hover:bg-gray-50"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-bg-chat">
+        <div class="flex gap-3 fade-in">
+          <div class="w-8 h-8 bg-primary-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold">M</div>
+          <div class="bg-white rounded-2xl rounded-tl-md px-4 py-3 shadow-sm max-w-[70%]">
+            <p class="text-sm">안녕하세요! 비서실장입니다. 오늘 현황을 정리해드릴게요.</p>
+          </div>
+        </div>
+        <div class="flex gap-3 fade-in">
+          <div class="w-8 h-8 bg-primary-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold">M</div>
+          <div class="bg-white rounded-2xl rounded-tl-md px-4 py-3 shadow-sm max-w-[70%]">
+            <p class="text-sm mb-3">할일관리앱 프로젝트 현황입니다:</p>
+            <table class="text-xs w-full border-collapse">
+              <thead><tr class="border-b border-gray-100"><th class="text-left py-1.5 text-txt-secondary font-medium">단계</th><th class="text-left py-1.5 text-txt-secondary font-medium">상태</th><th class="text-right py-1.5 text-txt-secondary font-medium">진행률</th></tr></thead>
+              <tbody>
+                <tr class="border-b border-gray-50"><td class="py-1.5">기획</td><td><span class="text-status-complete">완료</span></td><td class="text-right">100%</td></tr>
+                <tr class="border-b border-gray-50"><td class="py-1.5">디자인</td><td><span class="text-status-complete">완료</span></td><td class="text-right">100%</td></tr>
+                <tr class="border-b border-gray-50"><td class="py-1.5">개발</td><td><span class="text-status-active">진행 중</span></td><td class="text-right">60%</td></tr>
+                <tr><td class="py-1.5">테스트</td><td><span class="text-txt-tertiary">미시작</span></td><td class="text-right">0%</td></tr>
+              </tbody>
+            </table>
+            <div class="mt-3 flex items-center gap-2">
+              <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden"><div class="w-[43%] h-full bg-primary-500 rounded-full"></div></div>
+              <span class="text-xs font-medium text-primary-500">43%</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end fade-in">
+          <div class="bg-primary-100 rounded-2xl rounded-tr-md px-4 py-3 max-w-[70%]"><p class="text-sm">개발 완료 예상 시간은?</p></div>
+        </div>
+        <div class="flex gap-3 fade-in">
+          <div class="w-8 h-8 bg-primary-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold">M</div>
+          <div class="bg-white rounded-2xl rounded-tl-md px-4 py-3 shadow-sm max-w-[70%]">
+            <p class="text-sm">현재 진행 속도를 감안하면 <strong>약 4시간 후</strong> 개발 단계가 완료될 예정이에요. 완료되면 바로 알려드릴게요.</p>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <div class="w-8 h-8 bg-primary-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold">M</div>
+          <div class="bg-white rounded-2xl rounded-tl-md px-4 py-3 shadow-sm">
+            <div class="flex gap-1.5"><div class="w-2 h-2 bg-txt-tertiary rounded-full typing-dot"></div><div class="w-2 h-2 bg-txt-tertiary rounded-full typing-dot"></div><div class="w-2 h-2 bg-txt-tertiary rounded-full typing-dot"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-white border-t border-gray-100 px-6 py-3 rounded-b-2xl">
+        <div class="flex items-center gap-3">
+          <input type="text" placeholder="메시지를 입력하세요..." class="flex-1 px-4 py-2.5 bg-bg-base border border-gray-200 rounded-full focus:outline-none focus:border-primary-500 text-sm">
+          <button class="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white hover:bg-primary-600 transition shadow-md"><i data-lucide="send" class="w-4 h-4"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 4. APPROVAL POPUP (에이전트가 다가와 접촉) ==================== -->
+<div id="screen-approval-popup" class="screen">
+  <div class="min-h-screen bg-bg-base relative">
+    <div class="absolute inset-0 bg-bg-scene opacity-30"></div>
+    <div class="fixed inset-0 bg-black/30 z-40"></div>
+    <!-- Approaching agent indicator -->
+    <div class="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-amber-50 border border-amber-200 rounded-full px-6 py-2 shadow-lg fade-in flex items-center gap-3">
+      <div class="walk-anim text-2xl">🧑‍💼</div>
+      <div class="text-sm text-amber-700 font-medium">Main이 다가와 접촉했습니다 — 승인 요청</div>
+      <div class="text-2xl">🧑</div>
+    </div>
+    <!-- Approval popup modal -->
+    <div class="fixed inset-x-8 top-[15%] bottom-[15%] bg-white rounded-2xl z-50 flex flex-col shadow-2xl fade-in" style="max-width:600px; margin:0 auto;">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+        <div class="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold text-sm">M</div>
+        <div class="flex-1">
+          <div class="font-semibold text-sm">비서실장 — 승인 요청</div>
+          <div class="flex items-center gap-1 text-xs text-status-pending"><i data-lucide="alert-circle" class="w-3 h-3"></i> 승인 대기 1건</div>
+        </div>
+        <button class="p-2 text-txt-tertiary hover:text-txt-primary rounded-lg hover:bg-gray-50"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-bg-chat">
+        <div class="flex gap-3 fade-in">
+          <div class="w-8 h-8 bg-primary-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold">M</div>
+          <div class="bg-white rounded-2xl rounded-tl-md px-4 py-3 shadow-sm max-w-[80%]">
+            <p class="text-sm">프로젝트부 할일관리앱 팀에서 기획 단계가 완료돼서 결재를 가져왔어요.</p>
+          </div>
+        </div>
+        <!-- Approval card -->
+        <div class="flex gap-3 fade-in">
+          <div class="w-8 h-8 bg-primary-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold">M</div>
+          <div class="bg-white rounded-2xl rounded-tl-md shadow-sm max-w-[85%] overflow-hidden border border-gray-100">
+            <div class="bg-primary-50 px-4 py-2 border-b border-primary-100">
+              <div class="text-xs font-semibold text-primary-600 flex items-center gap-1"><i data-lucide="file-check" class="w-3.5 h-3.5"></i> 결재 요청</div>
+            </div>
+            <div class="px-4 py-3 space-y-2">
+              <div class="text-sm font-semibold">PRD 승인 요청 — 할일관리앱</div>
+              <div class="text-xs text-txt-secondary space-y-1">
+                <div class="flex justify-between"><span>핵심 기능</span><span class="font-medium text-txt-primary">12개</span></div>
+                <div class="flex justify-between"><span>예상 기간</span><span class="font-medium text-txt-primary">3일</span></div>
+                <div class="flex justify-between"><span>예상 비용</span><span class="font-medium text-txt-primary">$45.00</span></div>
+              </div>
+              <div class="text-xs text-txt-secondary mt-2">주요 기능: 할일 CRUD, 우선순위 관리, 태그 시스템, 반복 작업, 알림...</div>
+            </div>
+            <div class="px-4 py-3 border-t border-gray-100 flex gap-2">
+              <button class="flex-1 py-2 bg-status-complete text-white text-sm font-medium rounded-lg hover:opacity-90 transition">승인</button>
+              <button class="flex-1 py-2 bg-status-pending text-white text-sm font-medium rounded-lg hover:opacity-90 transition">수정 지시</button>
+              <button class="flex-1 py-2 bg-status-error text-white text-sm font-medium rounded-lg hover:opacity-90 transition">반려</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-white border-t border-gray-100 px-6 py-3 rounded-b-2xl">
+        <div class="flex items-center gap-3">
+          <input type="text" placeholder="메시지를 입력하세요..." class="flex-1 px-4 py-2.5 bg-bg-base border border-gray-200 rounded-full focus:outline-none focus:border-primary-500 text-sm">
+          <button class="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white"><i data-lucide="send" class="w-4 h-4"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 5. DASHBOARD ==================== -->
+<div id="screen-dashboard" class="screen">
+  <div class="min-h-screen bg-bg-base">
+    <!-- Top Navigation -->
+    <div class="bg-white border-b border-gray-100 px-6 flex items-center justify-between">
+      <div class="flex items-center gap-1">
+        <div class="flex items-center gap-2 mr-6">
+          <div class="w-7 h-7 bg-primary-500 rounded-lg flex items-center justify-center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 12h6M12 9v6"/></svg></div>
+          <span class="font-semibold text-sm">ClaudeManager</span>
+        </div>
+        <button class="top-nav-tab">워크스페이스</button>
+        <button class="top-nav-tab active">대시보드</button>
+        <button class="top-nav-tab">설정</button>
+        <button class="top-nav-tab">리소스 관리</button>
+      </div>
+      <button class="relative p-2 text-txt-secondary hover:text-primary-500"><i data-lucide="bell" class="w-5 h-5"></i></button>
+    </div>
+    <!-- Part tabs + sub tabs -->
+    <div class="bg-white border-b border-gray-100 px-6 py-2 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <button class="px-4 py-1.5 text-sm font-medium text-txt-secondary rounded-full hover:bg-gray-50">전체</button>
+        <button class="px-4 py-1.5 text-sm font-medium bg-primary-50 text-primary-500 rounded-full border border-primary-200">프로젝트관리부</button>
+        <button class="px-4 py-1.5 text-sm font-medium text-txt-secondary rounded-full hover:bg-gray-50">재무관리부</button>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="px-3 py-1 text-xs font-medium bg-primary-50 text-primary-500 rounded-full">리포트</button>
+        <button class="px-3 py-1 text-xs font-medium text-txt-secondary rounded-full hover:bg-gray-50">비용</button>
+        <button class="px-3 py-1 text-xs font-medium text-txt-secondary rounded-full hover:bg-gray-50">승인 이력</button>
+        <button class="px-3 py-1 text-xs font-medium text-txt-secondary rounded-full hover:bg-gray-50">오류 로그</button>
+      </div>
+    </div>
+    <!-- Dashboard content -->
+    <div class="p-8 max-w-5xl mx-auto space-y-6" style="max-height: calc(100vh - 130px); overflow-y:auto;">
+      <!-- Project progress -->
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+        <h2 class="text-lg font-bold mb-1">할일관리앱</h2>
+        <p class="text-sm text-txt-secondary mb-4">프로젝트관리부 / 시작일: 2026-04-14</p>
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-sm font-medium">전체 진행률</span>
+          <span class="text-lg font-bold text-primary-500">43%</span>
+        </div>
+        <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+          <div class="w-[43%] h-full bg-gradient-to-r from-primary-400 to-primary-500 rounded-full"></div>
+        </div>
+      </div>
+      <!-- Stage timeline -->
+      <div class="space-y-3">
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+          <div class="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center"><i data-lucide="check-circle-2" class="w-5 h-5 text-status-complete"></i></div>
+          <div class="flex-1"><div class="text-sm font-medium">기획</div><div class="text-xs text-txt-secondary">4/14 완료</div></div>
+          <div class="h-2 w-32 bg-status-complete rounded-full"></div>
+          <span class="text-xs font-medium text-status-complete">완료</span>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+          <div class="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center"><i data-lucide="check-circle-2" class="w-5 h-5 text-status-complete"></i></div>
+          <div class="flex-1"><div class="text-sm font-medium">디자인</div><div class="text-xs text-txt-secondary">4/15 완료</div></div>
+          <div class="h-2 w-32 bg-status-complete rounded-full"></div>
+          <span class="text-xs font-medium text-status-complete">완료</span>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-primary-100 flex items-center gap-4">
+          <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center"><i data-lucide="loader" class="w-5 h-5 text-status-active"></i></div>
+          <div class="flex-1"><div class="text-sm font-medium">개발</div><div class="text-xs text-txt-secondary">진행 중</div></div>
+          <div class="h-2 w-32 bg-gray-100 rounded-full overflow-hidden"><div class="w-3/5 h-full bg-status-active rounded-full"></div></div>
+          <span class="text-xs font-medium text-status-active">60%</span>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-4 opacity-50">
+          <div class="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center"><i data-lucide="circle" class="w-5 h-5 text-txt-tertiary"></i></div>
+          <div class="flex-1"><div class="text-sm font-medium">테스트</div><div class="text-xs text-txt-tertiary">미시작</div></div>
+          <div class="h-2 w-32 bg-gray-100 rounded-full"></div>
+          <span class="text-xs font-medium text-txt-tertiary">0%</span>
+        </div>
+      </div>
+      <!-- Cost summary -->
+      <div class="grid grid-cols-2 gap-6">
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <h3 class="text-sm font-semibold mb-3">월간 비용</h3>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-lg font-bold">$78 <span class="text-txt-tertiary font-normal text-sm">/ $100</span></span>
+          </div>
+          <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+            <div class="w-[78%] h-full bg-gradient-to-r from-status-pending to-amber-400 rounded-full"></div>
+          </div>
+          <div class="flex justify-between mt-1 text-xs text-txt-tertiary"><span>$0</span><span class="text-status-pending font-medium">78%</span><span>$100</span></div>
+        </div>
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <h3 class="text-sm font-semibold mb-3">최근 활동</h3>
+          <div class="space-y-2">
+            <div class="flex items-center gap-3 text-sm"><span class="w-2 h-2 rounded-full bg-status-active"></span><span class="text-txt-secondary">4/16</span> 개발 60% 도달</div>
+            <div class="flex items-center gap-3 text-sm"><span class="w-2 h-2 rounded-full bg-status-complete"></span><span class="text-txt-secondary">4/15</span> 디자인 완료</div>
+            <div class="flex items-center gap-3 text-sm"><span class="w-2 h-2 rounded-full bg-status-complete"></span><span class="text-txt-secondary">4/14</span> 기획 완료</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 6. SETTINGS ==================== -->
+<div id="screen-settings" class="screen">
+  <div class="min-h-screen bg-bg-base">
+    <!-- Top Navigation -->
+    <div class="bg-white border-b border-gray-100 px-6 flex items-center justify-between">
+      <div class="flex items-center gap-1">
+        <div class="flex items-center gap-2 mr-6">
+          <div class="w-7 h-7 bg-primary-500 rounded-lg flex items-center justify-center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 12h6M12 9v6"/></svg></div>
+          <span class="font-semibold text-sm">ClaudeManager</span>
+        </div>
+        <button class="top-nav-tab">워크스페이스</button>
+        <button class="top-nav-tab">대시보드</button>
+        <button class="top-nav-tab active">설정</button>
+        <button class="top-nav-tab">리소스 관리</button>
+      </div>
+      <button class="relative p-2 text-txt-secondary hover:text-primary-500"><i data-lucide="bell" class="w-5 h-5"></i></button>
+    </div>
+    <div class="flex" style="height: calc(100vh - 56px);">
+      <div class="w-52 bg-bg-sidebar border-r border-gray-100 p-4 space-y-1">
+        <button class="w-full text-left px-3 py-2.5 text-sm font-medium text-primary-500 bg-primary-50 rounded-lg border-l-2 border-primary-500">전역 설정</button>
+        <button class="w-full text-left px-3 py-2.5 text-sm text-txt-secondary hover:bg-white rounded-lg">Part별 정책</button>
+        <button class="w-full text-left px-3 py-2.5 text-sm text-txt-secondary hover:bg-white rounded-lg">백업/복원</button>
+      </div>
+      <div class="flex-1 p-8 overflow-y-auto">
+        <h3 class="text-base font-semibold mb-6">전역 설정</h3>
+        <div class="max-w-lg space-y-5">
+          <div>
+            <label class="block text-sm font-medium text-txt-secondary mb-1.5">재시도 횟수</label>
+            <input type="number" value="3" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-txt-secondary mb-1.5">재시도 간격</label>
+            <select class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500 text-sm bg-white">
+              <option>지수 백오프 (10초, 30초, 90초)</option><option>고정 간격</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-txt-secondary mb-1.5">알림 임계값 (%)</label>
+            <input type="number" value="80" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 text-sm">
+          </div>
+          <button class="w-full py-3 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 transition mt-4">저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 7. RESOURCES ==================== -->
+<div id="screen-resources" class="screen">
+  <div class="min-h-screen bg-bg-base">
+    <!-- Top Navigation -->
+    <div class="bg-white border-b border-gray-100 px-6 flex items-center justify-between">
+      <div class="flex items-center gap-1">
+        <div class="flex items-center gap-2 mr-6">
+          <div class="w-7 h-7 bg-primary-500 rounded-lg flex items-center justify-center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 12h6M12 9v6"/></svg></div>
+          <span class="font-semibold text-sm">ClaudeManager</span>
+        </div>
+        <button class="top-nav-tab">워크스페이스</button>
+        <button class="top-nav-tab">대시보드</button>
+        <button class="top-nav-tab">설정</button>
+        <button class="top-nav-tab active">리소스 관리</button>
+      </div>
+      <button class="relative p-2 text-txt-secondary hover:text-primary-500"><i data-lucide="bell" class="w-5 h-5"></i></button>
+    </div>
+    <!-- Sub tabs -->
+    <div class="bg-white border-b border-gray-100 px-6 py-2 flex items-center gap-2">
+      <button class="px-4 py-1.5 text-sm font-medium bg-primary-50 text-primary-500 rounded-full border border-primary-200">API 키</button>
+      <button class="px-4 py-1.5 text-sm font-medium text-txt-secondary rounded-full hover:bg-gray-50">에이전트 관리</button>
+      <button class="px-4 py-1.5 text-sm font-medium text-txt-secondary rounded-full hover:bg-gray-50">비용 한도</button>
+    </div>
+    <div class="p-8 max-w-5xl mx-auto space-y-6">
+      <!-- Cost limit -->
+      <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold">월간 비용 한도</h3>
+          <button class="text-xs text-primary-500 font-medium hover:text-primary-600">한도 변경</button>
+        </div>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-lg font-bold">$78 <span class="text-txt-tertiary font-normal text-sm">/ $100</span></span>
+        </div>
+        <div class="h-4 bg-gray-100 rounded-full overflow-hidden">
+          <div class="w-[78%] h-full bg-gradient-to-r from-status-pending to-amber-400 rounded-full"></div>
+        </div>
+      </div>
+      <!-- Agent limit -->
+      <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold">동시 에이전트 상한</h3>
+          <span class="text-sm font-bold text-primary-500">6 / 10</span>
+        </div>
+        <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+          <div class="w-[60%] h-full bg-primary-400 rounded-full"></div>
+        </div>
+        <p class="text-xs text-txt-tertiary mt-2">1~50 범위 (CPU/메모리 90% 초과 시 자동 일시정지)</p>
+      </div>
+      <!-- API Keys table -->
+      <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold">API 키 관리</h3>
+          <button class="px-3 py-1.5 bg-primary-500 text-white text-xs font-medium rounded-lg hover:bg-primary-600">+ 키 추가</button>
+        </div>
+        <table class="w-full text-sm">
+          <thead><tr class="border-b border-gray-100"><th class="text-left py-2 text-txt-secondary font-medium">제공사</th><th class="text-left py-2 text-txt-secondary font-medium">상태</th><th class="text-left py-2 text-txt-secondary font-medium">만료일</th><th class="text-right py-2 text-txt-secondary font-medium">이번 달 사용량</th></tr></thead>
+          <tbody>
+            <tr class="border-b border-gray-50"><td class="py-3 font-medium">Anthropic</td><td><span class="px-2 py-0.5 bg-green-50 text-status-complete text-xs rounded-full">활성</span></td><td class="text-txt-secondary">2026-12-31</td><td class="text-right font-medium">$65.00</td></tr>
+            <tr><td class="py-3 font-medium">OpenAI</td><td><span class="px-2 py-0.5 bg-green-50 text-status-complete text-xs rounded-full">활성</span></td><td class="text-txt-secondary">2026-08-15</td><td class="text-right font-medium">$13.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 8. AGENT MODAL (접촉 시 팝업) ==================== -->
+<div id="screen-agent-modal" class="screen">
+  <div class="min-h-screen bg-bg-base relative">
+    <div class="fixed inset-0 bg-black/40 z-40"></div>
+    <div class="fixed inset-x-4 top-[10%] bottom-[10%] bg-white rounded-2xl z-50 flex flex-col shadow-2xl fade-in" style="max-width:900px; margin:0 auto;">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-4">
+        <div class="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center text-xl">👩‍💻</div>
+        <div class="flex-1">
+          <div class="font-bold text-lg">할일관리앱 팀장</div>
+          <div class="text-xs text-txt-secondary flex items-center gap-2">
+            Sub 오케스트레이터
+            <span class="px-2 py-0.5 bg-green-50 text-status-complete rounded-full text-[10px] font-medium">개발 감독 중</span>
+            <span class="text-txt-tertiary">가동: 2h 15m</span>
+          </div>
+        </div>
+        <span class="text-[10px] text-txt-tertiary bg-primary-50 px-2 py-1 rounded-full">에이전트에 접촉하여 열림</span>
+        <button class="p-2 text-txt-tertiary hover:text-txt-primary transition rounded-lg hover:bg-gray-50"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="px-6 border-b border-gray-100 flex gap-6">
+        <button class="py-3 text-sm font-medium text-primary-500 border-b-2 border-primary-500">대화</button>
+        <button class="py-3 text-sm font-medium text-txt-tertiary hover:text-txt-secondary">노트</button>
+        <button class="py-3 text-sm font-medium text-txt-tertiary hover:text-txt-secondary relative">로그<span class="absolute -top-0.5 -right-3 w-4 h-4 bg-status-error text-white text-[9px] rounded-full flex items-center justify-center">3</span></button>
+        <button class="py-3 text-sm font-medium text-txt-tertiary hover:text-txt-secondary">터미널</button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-6 space-y-4">
+        <div class="flex items-start gap-3">
+          <div class="text-xs text-txt-tertiary w-14 pt-1 flex-shrink-0">14:00</div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="w-6 h-6 bg-part-finance/20 rounded-full flex items-center justify-center text-[10px]">P</span>
+            <i data-lucide="arrow-right" class="w-3 h-3 text-txt-tertiary"></i>
+            <span class="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center text-[10px]">S</span>
+          </div>
+          <div class="bg-bg-base rounded-xl px-4 py-2.5 text-sm flex-1">
+            <div class="text-[10px] text-txt-tertiary mb-1">Part → Sub</div>
+            "할일관리앱 프로젝트 시작. 기획 단계부터 진행하라."
+          </div>
+        </div>
+        <div class="flex items-start gap-3">
+          <div class="text-xs text-txt-tertiary w-14 pt-1 flex-shrink-0">15:30</div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-[10px]">I</span>
+            <i data-lucide="arrow-right" class="w-3 h-3 text-status-complete"></i>
+            <span class="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center text-[10px]">S</span>
+          </div>
+          <div class="bg-green-50 rounded-xl px-4 py-2.5 text-sm flex-1 border border-green-100">
+            <div class="text-[10px] text-status-complete mb-1">기획 인스턴스 → Sub (완료 보고)</div>
+            "PRD 초안 완료. 핵심 기능 14개 도출. 토큰: 입력 2,500 / 출력 1,200 / $0.03"
+          </div>
+        </div>
+        <div class="flex items-start gap-3">
+          <div class="text-xs text-txt-tertiary w-14 pt-1 flex-shrink-0">16:15</div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-[10px]">I</span>
+            <i data-lucide="arrow-right" class="w-3 h-3 text-status-error"></i>
+            <span class="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center text-[10px]">S</span>
+          </div>
+          <div class="bg-red-50 rounded-xl px-4 py-2.5 text-sm flex-1 border border-red-100">
+            <div class="text-[10px] text-status-error mb-1">디자인 인스턴스 → Sub (오류)</div>
+            "API timeout 발생. 재시도 1/3 진행 중..."
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 9. MOBILE CHAT ==================== -->
+<div id="screen-mobile-chat" class="screen">
+  <div class="flex justify-center bg-gray-200 min-h-screen py-8">
+    <div class="w-[390px] bg-bg-chat rounded-3xl overflow-hidden shadow-2xl border border-gray-300 flex flex-col" style="height:844px">
+      <div class="bg-white px-4 py-3 flex items-center gap-3 border-b border-gray-100">
+        <div class="w-9 h-9 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold text-xs">M</div>
+        <div><div class="font-semibold text-sm">비서실장</div><div class="flex items-center gap-1 text-[11px] text-txt-secondary"><span class="w-1.5 h-1.5 rounded-full bg-status-complete"></span> 연결됨</div></div>
+      </div>
+      <div class="bg-amber-50 border-b border-amber-100 px-4 py-2 flex items-center gap-2">
+        <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-status-pending"></i>
+        <span class="text-xs font-medium text-amber-700">승인 대기 1건</span>
+      </div>
+      <div class="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        <div class="flex gap-2">
+          <div class="w-7 h-7 bg-primary-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[10px] font-bold">M</div>
+          <div class="bg-white rounded-2xl rounded-tl-md px-3 py-2 shadow-sm max-w-[80%]">
+            <p class="text-[13px]">모바일로 접속하셨네요. 현황을 정리해드릴게요:</p>
+            <ul class="text-[13px] mt-1 space-y-0.5 text-txt-secondary">
+              <li>- 개발 80% 진행</li><li>- 승인 대기 1건</li><li>- 오류 0건</li>
+            </ul>
+          </div>
+        </div>
+        <div class="flex justify-end"><div class="bg-primary-100 rounded-2xl rounded-tr-md px-3 py-2 max-w-[80%]"><p class="text-[13px]">현황 알려줘</p></div></div>
+        <div class="flex gap-2">
+          <div class="w-7 h-7 bg-primary-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[10px] font-bold">M</div>
+          <div class="bg-white rounded-2xl rounded-tl-md shadow-sm max-w-[85%] overflow-hidden border border-gray-100">
+            <div class="bg-primary-50 px-3 py-1.5 text-[11px] font-semibold text-primary-600 border-b border-primary-100">결재 요청</div>
+            <div class="px-3 py-2">
+              <div class="text-[13px] font-medium">PRD 승인 — 할일관리앱</div>
+              <div class="text-[11px] text-txt-secondary mt-1">핵심 ��능 12개 / 예상 3일</div>
+            </div>
+            <div class="px-3 py-2 border-t border-gray-100 flex gap-2">
+              <button class="flex-1 py-1.5 bg-status-complete text-white text-xs font-medium rounded-lg">승인</button>
+              <button class="flex-1 py-1.5 bg-status-error text-white text-xs font-medium rounded-lg">반려</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-white border-t border-gray-100 px-4 py-2">
+        <div class="flex items-center gap-2">
+          <input type="text" placeholder="메시지를 입력��세요..." class="flex-1 px-3 py-2 bg-bg-base border border-gray-200 rounded-full text-[13px]">
+          <button class="w-9 h-9 bg-primary-500 rounded-full flex items-center justify-center text-white"><i data-lucide="send" class="w-3.5 h-3.5"></i></button>
+        </div>
+      </div>
+      <div class="bg-white border-t border-gray-100 flex">
+        <button class="flex-1 py-2.5 text-center text-[11px] font-medium text-primary-500 border-t-2 border-primary-500"><i data-lucide="message-circle" class="w-4 h-4 mx-auto mb-0.5"></i>채팅</button>
+        <button class="flex-1 py-2.5 text-center text-[11px] font-medium text-txt-tertiary"><i data-lucide="bell" class="w-4 h-4 mx-auto mb-0.5"></i>알림</button>
+        <button class="flex-1 py-2.5 text-center text-[11px] font-medium text-txt-tertiary"><i data-lucide="layout-grid" class="w-4 h-4 mx-auto mb-0.5"></i>상태</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 10. MOBILE STATUS ==================== -->
+<div id="screen-mobile-status" class="screen">
+  <div class="flex justify-center bg-gray-200 min-h-screen py-8">
+    <div class="w-[390px] bg-bg-base rounded-3xl overflow-hidden shadow-2xl border border-gray-300 flex flex-col" style="height:844px">
+      <div class="bg-white px-4 py-4 border-b border-gray-100"><h1 class="text-lg font-bold">상태</h1></div>
+      <div class="flex-1 overflow-y-auto p-4 space-y-3">
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-primary-500"></span><span class="font-semibold text-sm">프로젝트관리부</span></div>
+            <span class="px-2 py-0.5 bg-green-50 text-status-complete text-[11px] rounded-full font-medium">정상</span>
+          </div>
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center text-lg">👩‍💻</div>
+            <div><div class="text-sm font-medium">할일관리앱</div><div class="text-xs text-txt-secondary">에이전트 3개 활동</div></div>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden"><div class="w-4/5 h-full bg-status-active rounded-full"></div></div>
+            <span class="text-xs font-medium text-status-active">개발 80%</span>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-part-finance"></span><span class="font-semibold text-sm">재무관리부</span></div>
+            <span class="px-2 py-0.5 bg-green-50 text-status-complete text-[11px] rounded-full font-medium">정상</span>
+          </div>
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center text-lg">👨‍💼</div>
+            <div><div class="text-sm font-medium">월간 분석</div><div class="text-xs text-txt-secondary">에이전트 0개 대기</div></div>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-2 bg-status-complete rounded-full"></div>
+            <span class="text-xs font-medium text-status-complete">완료</span>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-red-100">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-part-daily"></span><span class="font-semibold text-sm">일상관리부</span></div>
+            <span class="px-2 py-0.5 bg-red-50 text-status-error text-[11px] rounded-full font-medium">오류</span>
+          </div>
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center text-lg">⚠️</div>
+            <div><div class="text-sm font-medium">일정 정리</div><div class="text-xs text-status-error">API 오류 — 재시도 3/3 실패</div></div>
+          </div>
+        </div>
+        <div class="text-center pt-4"><a href="#" class="text-sm text-primary-500 font-medium">데스크톱에서 자세히 보기 →</a></div>
+      </div>
+      <div class="bg-white border-t border-gray-100 flex">
+        <button class="flex-1 py-2.5 text-center text-[11px] font-medium text-txt-tertiary"><i data-lucide="message-circle" class="w-4 h-4 mx-auto mb-0.5"></i>채팅</button>
+        <button class="flex-1 py-2.5 text-center text-[11px] font-medium text-txt-tertiary"><i data-lucide="bell" class="w-4 h-4 mx-auto mb-0.5"></i>알림</button>
+        <button class="flex-1 py-2.5 text-center text-[11px] font-medium text-primary-500 border-t-2 border-primary-500"><i data-lucide="layout-grid" class="w-4 h-4 mx-auto mb-0.5"></i>상태</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+  function showScreen(name) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + name).classList.add('active');
+    document.querySelectorAll('.proto-nav button').forEach(b => {
+      b.classList.toggle('bg-white/20', b.dataset.screen === name);
+    });
+  }
+  lucide.createIcons();
+  showScreen('login');
+</script>
+
+</body>
+</html>

@@ -1,0 +1,261 @@
+:root {
+  /* Primary - Lavender Purple */
+  --primary-50: #F5F0FF;
+  --primary-100: #EDE5FF;
+  --primary-200: #D4C4FF;
+  --primary-300: #B49AFF;
+  --primary-400: #9B7AFF;
+  --primary-500: #7C5CFC;
+  --primary-600: #6344E0;
+  --primary-700: #4D30C0;
+
+  /* Secondary - Mint Green */
+  --secondary-50: #F0FDF9;
+  --secondary-100: #D9FBF0;
+  --secondary-300: #7EDCBB;
+  --secondary-500: #3EC9A0;
+  --secondary-600: #2DAD87;
+
+  /* Status */
+  --status-active: #5B9BF7;
+  --status-active-bg: #EEF4FF;
+  --status-active-text: #2563EB;
+  --status-pending: #F5A623;
+  --status-pending-bg: #FFF8EB;
+  --status-pending-text: #D48806;
+  --status-error: #F06060;
+  --status-error-bg: #FFF0F0;
+  --status-error-text: #DC2626;
+  --status-complete: #4ADE80;
+  --status-complete-bg: #F0FDF4;
+  --status-complete-text: #16A34A;
+  --status-idle: #A0AEC0;
+  --status-idle-bg: #F7FAFC;
+  --status-idle-text: #718096;
+  --status-stopped: #E2E8F0;
+  --status-stopped-bg: #F8FAFC;
+  --status-stopped-text: #94A3B8;
+
+  /* Background */
+  --bg-base: #F0F2F5;
+  --bg-base-alt: #E8ECF0;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --bg-overlay: rgba(0, 0, 0, 0.4);
+  --bg-sidebar: #F8F5F0;
+  --bg-chat: #FAF8F5;
+  --bg-3d-scene: #F5EDE3;
+
+  /* Text */
+  --text-primary: #1A1523;
+  --text-secondary: #6B6478;
+  --text-tertiary: #9E96AB;
+  --text-inverse: #FFFFFF;
+  --text-link: #7C5CFC;
+
+  /* Part Colors */
+  --part-purple: #7C5CFC;
+  --part-purple-bg: #EDE5FF;
+  --part-amber: #F5A623;
+  --part-amber-bg: #FFF8EB;
+  --part-mint: #3EC9A0;
+  --part-mint-bg: #D9FBF0;
+  --part-blue: #5B9BF7;
+  --part-blue-bg: #EEF4FF;
+  --part-coral: #F78B8B;
+  --part-coral-bg: #FFF0F0;
+
+  /* Spacing (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-card-elevated: 0 8px 32px rgba(0, 0, 0, 0.12);
+
+  /* Card */
+  --radius-card: 16px;
+  --radius-card-lg: 20px;
+  --radius-badge: 9999px;
+
+  /* Avatar */
+  --avatar-sm: 32px;
+  --avatar-md: 40px;
+  --avatar-lg: 56px;
+
+  /* Connection Lines */
+  --connection-line: #D1D5DB;
+  --connection-line-active: #7C5CFC;
+
+  /* Column */
+  --column-bg: transparent;
+  --column-border: #E2E8F0;
+
+  /* Prototype Dashboard */
+  --bg-page: #E8ECEF;
+  --bg-content-card: #F3F5F7;
+  --bg-card: #FFFFFF;
+  --bg-dark-card: #10141A;
+  --bg-nav: rgba(232,236,239,0.92);
+  --bg-bottom: #F5F6F8;
+  --border-light: #E5E7EB;
+  --border-column: #D1D5DB;
+  --accent-purple: #7C5CFC;
+  --accent-coral: #E8606D;
+  --accent-mint: #34D399;
+  --accent-amber: #F59E0B;
+
+  /* Dark Card (active highlight) */
+  --card-dark-bg: #10141A;
+  --card-dark-text: #FFFFFF;
+  --card-dark-secondary: #9CA3AF;
+  --card-dark-icon: #6B7280;
+
+  /* Badge Colors */
+  --badge-coral: #E8606D;
+  --badge-pink: #E8A2DB;
+  --badge-lavender: #B49AFF;
+
+  /* Sidebar */
+  --sidebar-width: 48px;
+  --sidebar-bg: #FFFFFF;
+
+  /* Typography */
+  --font-sans: 'Pretendard', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --text-display: 2rem;
+  --text-h1: 1.5rem;
+  --text-h2: 1.25rem;
+  --text-h3: 1rem;
+  --text-body: 0.875rem;
+  --text-small: 0.8125rem;
+  --text-caption: 0.75rem;
+  --text-overline: 0.6875rem;
+  --text-code: 0.8125rem;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 350ms ease;
+}
+
+/* ══════════════════════════════════════════════
+   Dark Theme
+   ══════════════════════════════════════════════ */
+[data-theme="dark"] {
+  /* Primary - keep accent, darken backgrounds */
+  --primary-50: #1A1530;
+  --primary-100: #231D40;
+  --primary-200: #3D2E6E;
+
+  /* Secondary */
+  --secondary-50: #0D1F1A;
+  --secondary-100: #132E25;
+
+  /* Status - keep colors, darken backgrounds */
+  --status-active-bg: #1A2332;
+  --status-active-text: #60A5FA;
+  --status-pending-bg: #2A2010;
+  --status-pending-text: #FBBF24;
+  --status-error-bg: #2A1515;
+  --status-error-text: #F87171;
+  --status-complete-bg: #0F2A1A;
+  --status-complete-text: #34D399;
+  --status-idle-bg: #1A1D24;
+  --status-idle-text: #94A3B8;
+  --status-stopped-bg: #1A1D24;
+  --status-stopped-text: #64748B;
+
+  /* Background */
+  --bg-base: #0D1117;
+  --bg-base-alt: #161B22;
+  --bg-surface: #161B22;
+  --bg-elevated: #1C2128;
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+  --bg-sidebar: #161B22;
+  --bg-chat: #161B22;
+  --bg-3d-scene: #0D1117;
+
+  /* Text */
+  --text-primary: #E6EDF3;
+  --text-secondary: #8B949E;
+  --text-tertiary: #6E7681;
+  --text-inverse: #0D1117;
+  --text-link: #A78BFA;
+
+  /* Part Colors - slightly muted for dark */
+  --part-purple-bg: #2D2350;
+  --part-amber-bg: #2A2010;
+  --part-mint-bg: #0F2A1A;
+  --part-blue-bg: #1A2332;
+  --part-coral-bg: #2A1515;
+
+  /* Shadows - stronger for dark */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-card-elevated: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  /* Connection Lines */
+  --connection-line: #30363D;
+  --connection-line-active: #A78BFA;
+
+  /* Column */
+  --column-bg: transparent;
+  --column-border: #30363D;
+
+  /* Prototype Dashboard */
+  --bg-page: #0D1117;
+  --bg-content-card: #161B22;
+  --bg-card: #1C2128;
+  --bg-dark-card: #0D1117;
+  --bg-nav: rgba(22, 27, 34, 0.95);
+  --bg-bottom: #161B22;
+  --border-light: #30363D;
+  --border-column: #30363D;
+
+  /* Card Dark (used for Main agent card) */
+  --card-dark-bg: #0D1117;
+  --card-dark-text: #E6EDF3;
+  --card-dark-secondary: #8B949E;
+  --card-dark-icon: #6E7681;
+
+  /* Sidebar */
+  --sidebar-bg: #161B22;
+
+  /* Scrollbar */
+  color-scheme: dark;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --text-display: 1.5rem;
+    --text-h1: 1.25rem;
+    --text-h2: 1.125rem;
+  }
+}

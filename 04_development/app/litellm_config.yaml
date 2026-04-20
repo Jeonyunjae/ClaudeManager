@@ -1,0 +1,58 @@
+# LiteLLM Configuration for ClaudeManager
+# See: https://docs.litellm.ai/docs/proxy/configs
+#
+# Usage:
+#   litellm --config litellm_config.yaml
+#
+# Environment variables needed:
+#   ANTHROPIC_API_KEY
+#   OPENAI_API_KEY (optional)
+
+model_list:
+  - model_name: claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-20250514
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-haiku
+    litellm_params:
+      model: anthropic/claude-3-5-haiku-latest
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-opus
+    litellm_params:
+      model: anthropic/claude-opus-4-20250514
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # Optional: OpenAI fallback
+  # - model_name: gpt-4o
+  #   litellm_params:
+  #     model: openai/gpt-4o
+  #     api_key: os.environ/OPENAI_API_KEY
+
+litellm_settings:
+  # Callback to ClaudeManager for token/cost tracking
+  success_callback: ["custom_callback"]
+  failure_callback: ["custom_callback"]
+
+  # Drop unsupported params silently
+  drop_params: true
+
+  # Logging
+  set_verbose: false
+
+general_settings:
+  # Master key for proxy authentication
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+  # Port
+  # port: 4000
+
+  # Database for usage tracking (optional — ClaudeManager handles its own)
+  # database_url: ""
+
+# Router settings for model routing
+router_settings:
+  routing_strategy: "simple-shuffle"
+  num_retries: 2
+  timeout: 120

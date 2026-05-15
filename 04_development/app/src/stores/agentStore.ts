@@ -40,6 +40,7 @@ type AgentState = {
   agents: Map<string, AgentTreeNode>;
   mainAgentId: string | null;
   isLoading: boolean;
+  initialized: boolean;
   error: string | null;
   fetchTree: () => Promise<void>;
   initMain: () => Promise<void>;
@@ -54,25 +55,31 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   agents: new Map(),
   mainAgentId: null,
   isLoading: false,
+  initialized: false,
   error: null,
 
   initMain: async () => {
+    console.log('[agentStore] initMain started');
     try {
       const res = await apiClient.post<{ agent: { id: string }; created: boolean }>('/api/agents/init-main', {});
       set({ mainAgentId: res.data.agent.id });
-    } catch {
-      // silent fail
+      console.log('[agentStore] initMain done:', res.data.agent.id);
+    } catch (err) {
+      console.error('[agentStore] initMain failed:', err);
     }
   },
 
   fetchTree: async () => {
+    console.log('[agentStore] fetchTree started');
     set({ isLoading: true, error: null });
     try {
       const res = await apiClient.get<AgentTreeNode[]>('/api/agents/tree');
       const tree = res.data;
-      set({ tree, agents: flattenTree(tree), isLoading: false });
-    } catch {
-      set({ isLoading: false });
+      console.log('[agentStore] fetchTree done:', tree.length, 'nodes');
+      set({ tree, agents: flattenTree(tree), isLoading: false, initialized: true });
+    } catch (err) {
+      console.error('[agentStore] fetchTree failed:', err);
+      set({ isLoading: false, initialized: true });
     }
   },
 

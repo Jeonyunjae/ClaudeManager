@@ -57,6 +57,13 @@ export function useWebSocket(): void {
       })
     );
 
+    unsubscribers.push(
+      wsClient.on('chat:stream', (payload) => {
+        const data = payload as { agentId: string; responseMsgId: string; content: string };
+        useAgentDetailStore.getState().receiveWsStream(data);
+      })
+    );
+
     // Approval events
     unsubscribers.push(
       wsClient.on('approval:request', (payload) => {

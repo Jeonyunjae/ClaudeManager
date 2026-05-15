@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Rnd } from 'react-rnd';
 import { useAgentDetailStore } from '@/stores/agentDetailStore';
 import { useAgentStore } from '@/stores/agentStore';
 import { apiClient } from '@/lib/api';
@@ -326,6 +327,23 @@ function InfoTab() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           {actionLoading === 'delete' ? '삭제 중...' : '삭제'}
         </button>
+        <button
+          style={{
+            padding: '8px 16px', borderRadius: '8px', border: 'none',
+            fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            background: '#E0E7FF', color: '#3730A3',
+            marginLeft: 'auto',
+          }}
+          onClick={async () => {
+            try {
+              await apiClient.post(`/api/agents/${selectedAgent.id}/open-terminal`, {});
+            } catch {}
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          Terminal
+        </button>
       </div>
     </div>
   );
@@ -421,7 +439,7 @@ function CLITab() {
                 <div style={termLineStyle}>
                   <span style={{ color: '#34D399' }}>$</span>{' '}
                   <span style={{ color: '#93C5FD' }}>claude</span>{' '}
-                  <span style={{ color: '#FCA5A5' }}>--print --resume</span>{' '}
+                  <span style={{ color: '#FCA5A5' }}>--print --continue</span>{' '}
                   <span style={{ color: '#FDE68A' }}>&quot;{log.prompt.length > 50 ? log.prompt.substring(0, 50) + '...' : log.prompt}&quot;</span>
                 </div>
                 {/* Response */}
@@ -459,7 +477,8 @@ function CLITab() {
    CHAT TAB
    ═══════════════════════════════════════════════ */
 function ChatTab() {
-  const { conversations, selectedAgent, sendMessage, cancelChat, isSending, hasMoreConversations, isLoadingMore, loadMoreConversations } = useAgentDetailStore();
+  const { conversations, selectedAgent, sendMessage, cancelChat, isAgentSending, hasMoreConversations, isLoadingMore, loadMoreConversations } = useAgentDetailStore();
+  const isSending = selectedAgent ? isAgentSending(selectedAgent.id) : false;
   const [inputValue, setInputValue] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<{ filename: string; path: string; type: string; preview?: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -1319,11 +1338,16 @@ function NoteTab() {
               {new Date(selectedNoteContent.updatedAt).toLocaleString('ko-KR')}
             </div>
             {/* Content */}
-            <div style={{
-              fontSize: '14px', color: T.textPrimary, lineHeight: 1.8,
-              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-            }}>
-              {selectedNoteContent.content}
+            <div
+              className="note-markdown"
+              style={{
+                fontSize: '14px', color: T.textPrimary, lineHeight: 1.7,
+                wordBreak: 'break-word',
+              }}
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {selectedNoteContent.content}
+              </ReactMarkdown>
             </div>
           </div>
         ) : (
@@ -1348,134 +1372,203 @@ function NoteTab() {
 export function AgentDetailPopup() {
   const { selectedAgent, isOpen, isLoading, activeTab, closeAgent, setActiveTab } = useAgentDetailStore();
 
+  // Floating window state (position + size). Set on first open only.
+  const [size, setSize] = useState<{ width: number; height: number }>({ width: 640, height: 560 });
+  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const initializedRef = useRef(false);
+
+  // Initialize position/size when popup opens for the first time
+  useEffect(() => {
+    if (!isOpen) {
+      initializedRef.current = false;
+      return;
+    }
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    // Determine initial size by active tab
+    let w = 640;
+    let h = 560;
+    if (activeTab === 'chat') {
+      w = 640;
+      h = 700;
+    } else if (activeTab === 'note') {
+      w = 820;
+      h = 600;
+    }
+
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const maxW = Math.max(420, vw - 40);
+    const maxH = Math.max(360, vh - 40);
+    const width = Math.min(w, maxW);
+    const height = Math.min(h, maxH);
+
+    setSize({ width, height });
+    setPosition({
+      x: Math.max(20, Math.round(vw / 2 - width / 2)),
+      y: Math.max(20, Math.round(vh / 2 - height / 2)),
+    });
+  }, [isOpen, activeTab]);
+
   if (!isOpen) return null;
 
-  // Popup width depends on active tab
-  const popupWidth = activeTab === 'note' ? '820px' : activeTab === 'cli' || activeTab === 'log' ? '640px' : '560px';
-  const popupHeight = activeTab === 'chat' ? '80vh' : undefined;
-  const popupMaxHeight = activeTab === 'chat' ? undefined : '85vh';
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const maxW = Math.max(420, vw - 40);
+  const maxH = Math.max(360, vh - 40);
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 50,
-      background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      fontSize: '13px', lineHeight: 1.5, color: T.textPrimary,
-    }} onClick={closeAgent}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: popupWidth,
-          height: popupHeight,
-          maxHeight: popupMaxHeight,
-          background: T.bgCard,
-          borderRadius: '18px',
-          boxShadow: T.shadowPopup,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          transition: 'width 0.2s ease',
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        background: 'rgba(0, 0, 0, 0.35)',
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+        fontSize: '13px', lineHeight: 1.5, color: T.textPrimary,
+      }}
+      onClick={closeAgent}
+    >
+      <Rnd
+        size={{ width: size.width, height: size.height }}
+        position={{ x: position.x, y: position.y }}
+        onDragStop={(_e, d) => setPosition({ x: d.x, y: d.y })}
+        onResizeStop={(_e, _dir, ref, _delta, pos) => {
+          setSize({ width: ref.offsetWidth, height: ref.offsetHeight });
+          setPosition({ x: pos.x, y: pos.y });
         }}
+        minWidth={420}
+        minHeight={360}
+        maxWidth={maxW}
+        maxHeight={maxH}
+        bounds="window"
+        dragHandleClassName="popup-drag-handle"
+        cancel=".popup-drag-cancel"
+        enableResizing={{
+          top: true, right: true, bottom: true, left: true,
+          topRight: true, bottomRight: true, bottomLeft: true, topLeft: true,
+        }}
+        style={{ pointerEvents: 'auto', zIndex: 50 }}
       >
-        {/* ── Header ── */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '12px',
-          padding: '20px 24px 16px', borderBottom: `1px solid ${T.borderLight}`,
-        }}>
-          {selectedAgent ? (
-            <>
-              <div style={{
-                width: '44px', height: '44px', borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 700, fontSize: '16px', color: 'white',
-                background: T.bgDarkCard,
-              }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '15px', fontWeight: 600 }}>{selectedAgent.name}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
-                  <span style={{
-                    fontSize: '10px', fontWeight: 500, padding: '2px 8px', borderRadius: '10px',
-                    ...statusBadgeStyle(selectedAgent.status),
-                  }}>
-                    {statusLabel(selectedAgent.status)}
-                  </span>
-                  <span style={{ fontSize: '11px', color: T.textTertiary }}>
-                    {selectedAgent.role === 'main' ? 'Main' : selectedAgent.name} &middot; {selectedAgent.modelName || 'claude'}
-                  </span>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div style={{ flex: 1, height: '44px', display: 'flex', alignItems: 'center' }}>
-              <div style={{ height: '16px', width: '128px', background: '#F3F4F6', borderRadius: '4px' }} />
-            </div>
-          )}
-          <button
-            onClick={closeAgent}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: '100%',
+            height: '100%',
+            background: T.bgCard,
+            borderRadius: '18px',
+            boxShadow: T.shadowPopup,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* ── Header (drag handle) ── */}
+          <div
+            className="popup-drag-handle"
             style={{
-              width: '32px', height: '32px', borderRadius: '8px',
-              border: 'none', background: 'transparent', color: T.textTertiary,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '18px',
+              display: 'flex', alignItems: 'center', gap: '12px',
+              padding: '20px 24px 16px', borderBottom: `1px solid ${T.borderLight}`,
+              cursor: 'move',
+              userSelect: 'none',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#F3F4F6'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
-            &times;
-          </button>
-        </div>
-
-        {/* ── Tabs ── */}
-        <div style={{ display: 'flex', borderBottom: `1px solid ${T.borderLight}` }}>
-          {getTabsForRole(selectedAgent?.role).map(tab => (
+            {selectedAgent ? (
+              <>
+                <div style={{
+                  width: '44px', height: '44px', borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, fontSize: '16px', color: 'white',
+                  background: T.bgDarkCard,
+                }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '15px', fontWeight: 600 }}>{selectedAgent.name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
+                    <span style={{
+                      fontSize: '10px', fontWeight: 500, padding: '2px 8px', borderRadius: '10px',
+                      ...statusBadgeStyle(selectedAgent.status),
+                    }}>
+                      {statusLabel(selectedAgent.status)}
+                    </span>
+                    <span style={{ fontSize: '11px', color: T.textTertiary }}>
+                      {selectedAgent.role === 'main' ? 'Main' : selectedAgent.name} &middot; {selectedAgent.modelName || 'claude'}
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div style={{ flex: 1, height: '44px', display: 'flex', alignItems: 'center' }}>
+                <div style={{ height: '16px', width: '128px', background: '#F3F4F6', borderRadius: '4px' }} />
+              </div>
+            )}
             <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              className="popup-drag-cancel"
+              onClick={closeAgent}
               style={{
-                flex: 1, padding: '12px', textAlign: 'center',
-                fontSize: '12px', fontWeight: 500,
-                color: activeTab === tab.key ? T.accentPurple : T.textTertiary,
-                border: 'none', background: 'transparent', cursor: 'pointer',
-                position: 'relative', transition: 'color 0.15s',
-                textDecoration: 'none',
+                width: '32px', height: '32px', borderRadius: '8px',
+                border: 'none', background: 'transparent', color: T.textTertiary,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '18px',
               }}
-              onMouseEnter={(e) => { if (activeTab !== tab.key) e.currentTarget.style.color = T.textSecondary; }}
-              onMouseLeave={(e) => { if (activeTab !== tab.key) e.currentTarget.style.color = T.textTertiary; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#F3F4F6'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             >
-              {tab.label}
-              {activeTab === tab.key && (
-                <span style={{
-                  position: 'absolute', bottom: 0,
-                  left: '25%', right: '25%', height: '2px',
-                  background: T.accentPurple, borderRadius: '2px',
-                }} />
-              )}
+              &times;
             </button>
-          ))}
-        </div>
-
-        {/* ── Content ── */}
-        {isLoading ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
-            <div style={{
-              width: '24px', height: '24px', border: '2px solid #E5E7EB',
-              borderTopColor: T.accentPurple, borderRadius: '50%',
-              animation: 'spin 0.8s linear infinite',
-            }} />
           </div>
-        ) : (
-          <>
-            {activeTab === 'info' && <InfoTab />}
-            {activeTab === 'cli' && <CLITab />}
-            {activeTab === 'chat' && <ChatTab />}
-            {activeTab === 'log' && <LogTab />}
-            {activeTab === 'note' && <NoteTab />}
-          </>
-        )}
-      </div>
+
+          {/* ── Tabs ── */}
+          <div className="popup-drag-cancel" style={{ display: 'flex', borderBottom: `1px solid ${T.borderLight}` }}>
+            {getTabsForRole(selectedAgent?.role).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  flex: 1, padding: '12px', textAlign: 'center',
+                  fontSize: '12px', fontWeight: 500,
+                  color: activeTab === tab.key ? T.accentPurple : T.textTertiary,
+                  border: 'none', background: 'transparent', cursor: 'pointer',
+                  position: 'relative', transition: 'color 0.15s',
+                  textDecoration: 'none',
+                }}
+                onMouseEnter={(e) => { if (activeTab !== tab.key) e.currentTarget.style.color = T.textSecondary; }}
+                onMouseLeave={(e) => { if (activeTab !== tab.key) e.currentTarget.style.color = T.textTertiary; }}
+              >
+                {tab.label}
+                {activeTab === tab.key && (
+                  <span style={{
+                    position: 'absolute', bottom: 0,
+                    left: '25%', right: '25%', height: '2px',
+                    background: T.accentPurple, borderRadius: '2px',
+                  }} />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Content ── */}
+          <div className="popup-drag-cancel" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            {isLoading ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
+                <div style={{
+                  width: '24px', height: '24px', border: '2px solid #E5E7EB',
+                  borderTopColor: T.accentPurple, borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite',
+                }} />
+              </div>
+            ) : (
+              <>
+                {activeTab === 'info' && <InfoTab />}
+                {activeTab === 'cli' && <CLITab />}
+                {activeTab === 'chat' && <ChatTab />}
+                {activeTab === 'log' && <LogTab />}
+                {activeTab === 'note' && <NoteTab />}
+              </>
+            )}
+          </div>
+        </div>
+      </Rnd>
 
       {/* CSS keyframes via style tag */}
       <style>{`

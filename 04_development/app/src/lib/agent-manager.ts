@@ -3,12 +3,18 @@
  *
  * Session persistence via DB:
  *   - session_id is saved to agents.cli_session_id in DB
- *   - On server restart, loads session_id from DB and resumes with --resume
+ *   - On server restart, loads session_id from DB and continues with --continue
  *   - CLI session files are on disk (~/.claude/), so context survives reboots
  */
 
 import { spawn } from 'child_process';
 import { EventEmitter } from 'events';
+
+function ts() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
 
 export interface CLIResult {
   type: string;
@@ -43,6 +49,7 @@ export interface AgentSession {
   startedAt: Date;
   lastActivity: Date;
   systemPrompt?: string;
+  projectRoot?: string;
   messageCount: number;
   cliLogs: CLILogEntry[];
   activeProcess?: import('child_process').ChildProcess;
@@ -50,10 +57,12 @@ export interface AgentSession {
 
 // Callback to persist session_id to DB (injected from outside to avoid circular imports)
 type SessionPersister = (agentId: string, sessionId: string) => void | Promise<void>;
+type SessionLoader = (agentId: string) => Promise<{ sessionId: string | null; projectRoot: string | null }>;
 
 class AgentManager extends EventEmitter {
   private sessions: Map<string, AgentSession> = new Map();
   private sessionPersister: SessionPersister | null = null;
+  private sessionLoader: SessionLoader | null = null;
 
   /**
    * Set the callback that saves session_id to DB.
@@ -62,11 +71,18 @@ class AgentManager extends EventEmitter {
     this.sessionPersister = fn;
   }
 
+  /**
+   * Set the callback that loads session_id from DB.
+   */
+  setSessionLoader(fn: SessionLoader): void {
+    this.sessionLoader = fn;
+  }
+
   private persistSession(agentId: string, sessionId: string): void {
     if (this.sessionPersister) {
       // Fire-and-forget: catch errors to prevent unhandled rejections from async persisters
       Promise.resolve(this.sessionPersister(agentId, sessionId)).catch((err) => {
-        console.error('[AgentManager] Failed to persist session:', err);
+        console.error(`[${ts()}] [AgentManager] Failed to persist session:`, err);
       });
     }
   }
@@ -74,7 +90,7 @@ class AgentManager extends EventEmitter {
   /**
    * Resume an agent from an existing session_id (loaded from DB).
    */
-  resumeAgent(agentId: string, sessionId: string, systemPrompt?: string): AgentSession {
+  resumeAgent(agentId: string, sessionId: string, systemPrompt?: string, projectRoot?: string): AgentSession {
     const session: AgentSession = {
       agentId,
       sessionId,
@@ -82,11 +98,12 @@ class AgentManager extends EventEmitter {
       startedAt: new Date(),
       lastActivity: new Date(),
       systemPrompt,
+      projectRoot,
       messageCount: 0,
       cliLogs: [],
     };
     this.sessions.set(agentId, session);
-    console.log(`[AgentManager] Agent ${agentId} resumed with session ${sessionId}`);
+    console.log(`[${ts()}] [AgentManager] Agent "${agentId}" resumed (session: ${sessionId.substring(0, 8)}…)`);
     return session;
   }
 
@@ -127,31 +144,54 @@ class AgentManager extends EventEmitter {
     this.persistSession(agentId, result.session_id);
     this.emit('agent:started', agentId);
 
-    console.log(`[AgentManager] Agent ${agentId} initialized with session ${result.session_id}`);
+    console.log(`[${ts()}] [AgentManager] Agent "${agentId}" initialized (session: ${result.session_id.substring(0, 8)}…)`);
     return session;
   }
 
   /**
-   * Send a message to an agent and get the response.
+   * Send a message to an agent and get the response (streaming).
    */
-  async sendMessage(agentId: string, content: string, systemPrompt?: string, modelName?: string): Promise<{ text: string; costUsd: number; inputTokens: number; outputTokens: number; durationMs: number; modelName: string }> {
+  async sendMessage(agentId: string, content: string, systemPrompt?: string, modelName?: string, onStream?: (text: string) => void): Promise<{ text: string; costUsd: number; inputTokens: number; outputTokens: number; durationMs: number; modelName: string }> {
     let session = this.sessions.get(agentId);
+    let projectRoot: string | undefined;
 
     if (!session || !session.sessionId) {
-      session = await this.initAgent(agentId, systemPrompt);
+      if (this.sessionLoader) {
+        const stored = await this.sessionLoader(agentId);
+        if (stored.sessionId) {
+          session = this.resumeAgent(agentId, stored.sessionId, systemPrompt, stored.projectRoot || undefined);
+        }
+        projectRoot = stored.projectRoot || undefined;
+      }
+      if (!session || !session.sessionId) {
+        session = {
+          agentId,
+          sessionId: null,
+          status: 'active',
+          startedAt: new Date(),
+          lastActivity: new Date(),
+          systemPrompt,
+          projectRoot,
+          messageCount: 0,
+          cliLogs: [],
+        };
+        this.sessions.set(agentId, session);
+      }
     }
 
     session.status = 'active';
     session.lastActivity = new Date();
-    this.emit('agent:stream', agentId, { type: 'system', content: 'Processing...' });
 
     const model = modelName || 'sonnet';
 
     try {
       const result = await this.execCLI({
         prompt: content,
-        resumeSessionId: session.sessionId!,
+        systemPrompt,
+        resumeSessionId: session.sessionId || undefined,
+        projectRoot: session.projectRoot,
         model,
+        onStream,
       });
 
       session.sessionId = result.session_id;
@@ -160,7 +200,7 @@ class AgentManager extends EventEmitter {
       session.lastActivity = new Date();
       session.cliLogs.push({
         timestamp: new Date().toISOString(),
-        command: `claude --resume ${session.sessionId?.substring(0, 8)}... -p "${content.substring(0, 40)}..."`,
+        command: `claude --continue ${session.sessionId?.substring(0, 8)}... -p "${content.substring(0, 40)}..."`,
         prompt: content,
         response: result.result,
         costUsd: result.total_cost_usd || 0,
@@ -170,7 +210,6 @@ class AgentManager extends EventEmitter {
         isError: false,
       });
 
-      // Persist updated session_id
       this.persistSession(agentId, result.session_id);
 
       this.emit('agent:response', agentId, result.result);
@@ -187,7 +226,7 @@ class AgentManager extends EventEmitter {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       session.cliLogs.push({
         timestamp: new Date().toISOString(),
-        command: `claude --resume ${session.sessionId?.substring(0, 8)}... -p "${content.substring(0, 40)}..."`,
+        command: `claude --continue ${session.sessionId?.substring(0, 8)}... -p "${content.substring(0, 40)}..."`,
         prompt: content,
         response: errorMsg,
         costUsd: 0,
@@ -202,40 +241,55 @@ class AgentManager extends EventEmitter {
   }
 
   /**
-   * Execute a Claude CLI command and parse JSON result.
+   * Execute a Claude CLI command with stream-json output.
    */
   private execCLI(options: {
     prompt: string;
     systemPrompt?: string;
     resumeSessionId?: string;
+    projectRoot?: string;
     model?: string;
+    onStream?: (text: string) => void;
   }): Promise<CLIResult> {
     return new Promise((resolve, reject) => {
-      const projectRoot = process.env.PROJECT_ROOT || '';
+      const agentProjectRoot = options.projectRoot || process.env.PROJECT_ROOT || '';
       const model = options.model || 'sonnet';
-      const args = ['--print', '--output-format', 'json', '--permission-mode', 'bypassPermissions', '--model', model];
+      const args = ['--print', '--verbose', '--output-format', 'stream-json', '--permission-mode', 'bypassPermissions', '--model', model];
 
-      if (projectRoot) {
-        args.push('--add-dir', projectRoot);
-      }
-
-      if (options.systemPrompt) {
-        args.push('--system-prompt', options.systemPrompt);
+      if (agentProjectRoot) {
+        args.push('--add-dir', agentProjectRoot);
       }
 
       if (options.resumeSessionId) {
-        args.push('--resume', options.resumeSessionId);
+        args.push('--continue', options.resumeSessionId);
+      } else if (options.systemPrompt) {
+        args.push('--system-prompt', options.systemPrompt);
       }
 
       args.push('-p', options.prompt);
 
+      console.log(`[${ts()}] [AgentManager] execCLI args: resume=${options.resumeSessionId || 'NEW'}, model=${model}, prompt_len=${options.prompt.length}, system_len=${options.systemPrompt?.length || 0}`);
+
+      // Each agent gets an isolated temp CWD to prevent session contamination
+      // from parent Claude Code sessions sharing the same project directory.
+      const agentId2 = options.resumeSessionId
+        ? Array.from(this.sessions.entries()).find(([, s]) => s.sessionId === options.resumeSessionId)?.[0]
+        : Array.from(this.sessions.entries()).find(([, s]) => !s.sessionId)?.[0];
+      const isolatedCwd = `/tmp/cm-agent-${agentId2 || 'unknown'}`;
+      require('fs').mkdirSync(isolatedCwd, { recursive: true });
+
+      const cleanEnv = { ...process.env };
+      delete cleanEnv.CLAUDECODE;
+      delete cleanEnv.AI_AGENT;
+      delete cleanEnv.CLAUDE_CODE_ENTRYPOINT;
+      delete cleanEnv.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS;
+      delete cleanEnv.CLAUDE_CODE_EXECPATH;
       const proc = spawn('claude', args, {
-        cwd: process.cwd(),
-        env: { ...process.env },
+        cwd: isolatedCwd,
+        env: cleanEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
 
-      // Track active process for cancellation
       const agentId = options.resumeSessionId
         ? Array.from(this.sessions.entries()).find(([, s]) => s.sessionId === options.resumeSessionId)?.[0]
         : undefined;
@@ -244,11 +298,31 @@ class AgentManager extends EventEmitter {
         if (session) session.activeProcess = proc;
       }
 
-      let stdout = '';
       let stderr = '';
+      let lastResult: CLIResult | null = null;
+      let lineBuf = '';
 
       proc.stdout?.on('data', (data: Buffer) => {
-        stdout += data.toString();
+        lineBuf += data.toString();
+        const lines = lineBuf.split('\n');
+        lineBuf = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const event = JSON.parse(trimmed);
+            if (event.type === 'assistant' && event.subtype === 'text') {
+              if (options.onStream && event.content) {
+                options.onStream(event.content);
+              }
+            } else if (event.type === 'result') {
+              lastResult = event as CLIResult;
+            }
+          } catch {
+            // partial JSON line, ignore
+          }
+        }
       });
 
       proc.stderr?.on('data', (data: Buffer) => {
@@ -256,26 +330,39 @@ class AgentManager extends EventEmitter {
       });
 
       proc.on('close', (code) => {
-        // Clear active process reference
         if (agentId) {
           const session = this.sessions.get(agentId);
           if (session) session.activeProcess = undefined;
         }
 
-        if (code !== 0) {
-          reject(new Error(`CLI exited with code ${code}: ${stderr || stdout}`));
+        // Process remaining buffer
+        if (lineBuf.trim()) {
+          try {
+            const event = JSON.parse(lineBuf.trim());
+            if (event.type === 'result') {
+              lastResult = event as CLIResult;
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        if (code !== 0 && !lastResult) {
+          reject(new Error(`CLI exited with code ${code}: ${stderr}`));
           return;
         }
 
-        try {
-          const result = JSON.parse(stdout.trim()) as CLIResult;
-          if (result.is_error) {
-            reject(new Error(result.result || 'CLI returned error'));
+        if (lastResult) {
+          if (lastResult.is_error) {
+            const errDetail = lastResult.result || stderr || 'CLI returned error';
+            console.error(`[${ts()}] [AgentManager] CLI error: ${errDetail}`);
+            reject(new Error(errDetail));
             return;
           }
-          resolve(result);
-        } catch {
-          reject(new Error(`Failed to parse CLI output: ${stdout.substring(0, 200)}`));
+          console.log(`[${ts()}] [AgentManager] CLI result — session_id: ${lastResult.session_id}, result_len: ${lastResult.result?.length}, result_preview: ${lastResult.result?.substring(0, 80)}`);
+          resolve(lastResult);
+        } else {
+          reject(new Error(`No result event received from CLI`));
         }
       });
 

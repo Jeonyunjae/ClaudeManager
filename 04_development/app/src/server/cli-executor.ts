@@ -15,6 +15,12 @@ import { agentManager } from '../lib/agent-manager';
 import { loadMainSkill, parseActions } from '../lib/skill-loader';
 import { broadcast } from './ws-server';
 
+function ts() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 export interface CliExecutionRequest {
   agentId: string;
   agentName: string;
@@ -31,13 +37,25 @@ export interface CliExecutionRequest {
  */
 export async function processChatInBackground(req: CliExecutionRequest): Promise<void> {
   const { agentId, agentName, modelName, cliPrompt, systemPrompt, responseMsgId, userId } = req;
+  console.log(`[${ts()}] [CLI] ▶ ${agentName}(${agentId}) — prompt(${cliPrompt.length} chars):\n${cliPrompt}\n--- END PROMPT ---`);
+
+  // Broadcast active status
+  broadcast('agent:status', { agentId, status: 'active', statusMessage: cliPrompt.length > 60 ? cliPrompt.substring(0, 60) + '…' : cliPrompt });
+  try {
+    await db.update(agents).set({ status: 'active', statusMessage: cliPrompt.length > 60 ? cliPrompt.substring(0, 60) + '…' : cliPrompt }).where(eq(agents.id, agentId));
+  } catch {}
 
   try {
+    let streamedText = '';
     const cliResponse = await agentManager.sendMessage(
       agentId,
       cliPrompt,
       systemPrompt,
       modelName,
+      (chunk: string) => {
+        streamedText += chunk;
+        broadcast('chat:stream', { agentId, responseMsgId, content: streamedText });
+      },
     );
 
     // Parse actions from response
@@ -67,6 +85,14 @@ export async function processChatInBackground(req: CliExecutionRequest): Promise
       messageType: 'text',
       metadata: JSON.stringify({ agentId }),
     });
+
+    console.log(`[${ts()}] [CLI] ✔ ${agentName} — ${cliResponse.durationMs}ms, $${cliResponse.costUsd.toFixed(4)}, in:${cliResponse.inputTokens} out:${cliResponse.outputTokens}`);
+
+    // Broadcast idle status
+    broadcast('agent:status', { agentId, status: 'idle', statusMessage: 'Completed' });
+    try {
+      await db.update(agents).set({ status: 'idle', statusMessage: 'Completed' }).where(eq(agents.id, agentId));
+    } catch {}
 
     broadcast('chat:typing', { agentId, isTyping: false });
     broadcast('chat:message', {
@@ -99,6 +125,13 @@ export async function processChatInBackground(req: CliExecutionRequest): Promise
 
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error(`[${ts()}] [CLI] ✘ ${agentName} — ${errorMsg}`);
+
+    // Broadcast error status
+    broadcast('agent:status', { agentId, status: 'error', statusMessage: errorMsg.length > 60 ? errorMsg.substring(0, 60) + '…' : errorMsg });
+    try {
+      await db.update(agents).set({ status: 'error', statusMessage: errorMsg.length > 60 ? errorMsg.substring(0, 60) + '…' : errorMsg }).where(eq(agents.id, agentId));
+    } catch {}
 
     await db.insert(chatMessages).values({
       id: responseMsgId,

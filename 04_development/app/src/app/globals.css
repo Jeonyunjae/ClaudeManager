@@ -308,3 +308,104 @@ body {
   margin: 6px 0;
   color: #6B7280;
 }
+
+/* ── Note Markdown Rendering (Obsidian-like) ── */
+.note-markdown > :first-child { margin-top: 0; }
+.note-markdown > :last-child { margin-bottom: 0; }
+.note-markdown h1 {
+  font-size: 28px; font-weight: 700; color: #10141A;
+  margin: 24px 0 12px; line-height: 1.3;
+  padding-bottom: 8px; border-bottom: 1px solid #E5E7EB;
+}
+.note-markdown h2 {
+  font-size: 22px; font-weight: 700; color: #10141A;
+  margin: 20px 0 10px; line-height: 1.3;
+}
+.note-markdown h3 {
+  font-size: 18px; font-weight: 600; color: #10141A;
+  margin: 18px 0 8px; line-height: 1.3;
+}
+.note-markdown h4 {
+  font-size: 16px; font-weight: 600; color: #10141A;
+  margin: 14px 0 6px; line-height: 1.3;
+}
+.note-markdown h5, .note-markdown h6 {
+  font-size: 14px; font-weight: 600; color: #10141A;
+  margin: 12px 0 6px;
+}
+.note-markdown p { margin: 8px 0; }
+.note-markdown ul, .note-markdown ol { margin: 8px 0; padding-left: 24px; }
+.note-markdown li { margin: 4px 0; }
+.note-markdown li > ul, .note-markdown li > ol { margin: 4px 0; }
+.note-markdown strong { font-weight: 700; color: #10141A; }
+.note-markdown em { font-style: italic; }
+.note-markdown del { text-decoration: line-through; color: #9CA3AF; }
+.note-markdown a {
+  color: #7C5CFC; text-decoration: none; border-bottom: 1px solid rgba(124,92,252,0.3);
+}
+.note-markdown a:hover { border-bottom-color: #7C5CFC; }
+.note-markdown code {
+  background: rgba(124,92,252,0.08);
+  color: #5B3CD9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', 'Menlo', monospace;
+}
+.note-markdown pre {
+  background: #1E1E2E;
+  color: #CDD6F4;
+  padding: 14px 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 12px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.note-markdown pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: 13px;
+}
+.note-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.note-markdown th {
+  background: #F3F4F6;
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid #E5E7EB;
+}
+.note-markdown td {
+  padding: 8px 12px;
+  border: 1px solid #E5E7EB;
+}
+.note-markdown hr {
+  border: none;
+  border-top: 1px solid #E5E7EB;
+  margin: 20px 0;
+}
+.note-markdown blockquote {
+  border-left: 3px solid #7C5CFC;
+  padding: 4px 12px;
+  margin: 12px 0;
+  color: #4B5563;
+  background: rgba(124,92,252,0.04);
+  border-radius: 0 4px 4px 0;
+}
+.note-markdown blockquote > :first-child { margin-top: 0; }
+.note-markdown blockquote > :last-child { margin-bottom: 0; }
+.note-markdown input[type="checkbox"] {
+  margin-right: 6px;
+  cursor: default;
+}
+.note-markdown img {
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 12px 0;
+}

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YJ Manager — CLI 탭</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg-page: #E8ECEF;
+    --bg-card: #FFFFFF;
+    --bg-dark-card: #10141A;
+    --text-primary: #10141A;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+    --text-white: #FFFFFF;
+    --border-light: #E5E7EB;
+    --accent-purple: #7C5CFC;
+    --accent-mint: #34D399;
+    --status-active: #3B82F6;
+    --shadow-popup: 0 20px 60px rgba(0,0,0,0.15);
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-size: 13px; line-height: 1.5;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+  }
+  .popup-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .popup {
+    width: 640px; max-height: 85vh; background: var(--bg-card);
+    border-radius: 18px; box-shadow: var(--shadow-popup);
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .popup-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 20px 24px 16px; border-bottom: 1px solid var(--border-light);
+  }
+  .popup-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; color: white;
+  }
+  .popup-header-info { flex: 1; }
+  .popup-header-name { font-size: 15px; font-weight: 600; }
+  .popup-header-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+  .popup-status-badge { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 10px; }
+  .popup-close {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: none; background: transparent; color: var(--text-tertiary);
+    cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .popup-close:hover { background: #F3F4F6; }
+  .popup-tabs { display: flex; border-bottom: 1px solid var(--border-light); }
+  .popup-tab {
+    flex: 1; padding: 12px; text-align: center;
+    font-size: 12px; font-weight: 500; color: var(--text-tertiary);
+    border: none; background: transparent; cursor: pointer;
+    position: relative; transition: color 0.15s; text-decoration: none;
+  }
+  .popup-tab:hover { color: var(--text-secondary); }
+  .popup-tab.active { color: var(--accent-purple); }
+  .popup-tab.active::after {
+    content: ''; position: absolute; bottom: 0;
+    left: 25%; right: 25%; height: 2px;
+    background: var(--accent-purple); border-radius: 2px;
+  }
+  .popup-content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+  /* ── CLI Tab ── */
+  .terminal-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .terminal-session-info {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .terminal-session-badge {
+    font-size: 11px; font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    background: #F3F4F6; padding: 3px 10px; border-radius: 6px;
+    color: var(--text-secondary);
+  }
+  .terminal-status-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--accent-mint);
+  }
+  .terminal-status-label { font-size: 10px; color: var(--accent-mint); font-weight: 500; }
+  .terminal-toolbar-actions {
+    display: flex; gap: 4px;
+  }
+  .terminal-toolbar-btn {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: none; background: transparent; color: var(--text-tertiary);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .terminal-toolbar-btn:hover { background: #F3F4F6; color: var(--text-secondary); }
+
+  .terminal-view {
+    background: var(--bg-dark-card); border-radius: 12px;
+    overflow: hidden;
+  }
+  .terminal-header {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 16px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .terminal-dot.red { background: #FF5F56; }
+  .terminal-dot.yellow { background: #FFBD2E; }
+  .terminal-dot.green { background: #27C93F; }
+  .terminal-session-name {
+    font-size: 11px; color: #6B7280; margin-left: 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .terminal-body {
+    padding: 16px; min-height: 340px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; line-height: 1.7;
+  }
+  .terminal-line { color: #D1D5DB; }
+  .terminal-line .prompt { color: #34D399; }
+  .terminal-line .cmd { color: #93C5FD; }
+  .terminal-line .flag { color: #FCA5A5; }
+  .terminal-line .string { color: #FDE68A; }
+  .terminal-line .comment { color: #4B5563; }
+  .terminal-line .success { color: #34D399; }
+  .terminal-line .info { color: #93C5FD; }
+  .terminal-line .dim { color: #6B7280; }
+  .terminal-line .error { color: #F87171; }
+  .terminal-line .output { color: #E5E7EB; }
+  .terminal-line + .terminal-line { margin-top: 2px; }
+  .terminal-separator { height: 1px; background: rgba(255,255,255,0.06); margin: 12px 0; }
+
+  .terminal-input-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 16px;
+    padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .terminal-input-prompt { color: #34D399; font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+  .terminal-input {
+    flex: 1; background: transparent; border: none;
+    color: #D1D5DB; font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; padding: 4px 0; outline: none;
+    caret-color: #34D399;
+  }
+  .terminal-cursor {
+    width: 7px; height: 14px; background: #34D399;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .back-link {
+    display: block; text-align: center; margin-top: 20px;
+    font-size: 12px; color: var(--accent-purple); text-decoration: none;
+  }
+  .back-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="popup-overlay">
+  <div class="popup">
+    <!-- Header -->
+    <div class="popup-header">
+      <div class="popup-avatar" style="background:#10141A;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="popup-header-info">
+        <div class="popup-header-name">Main</div>
+        <div class="popup-header-meta">
+          <span class="popup-status-badge" style="background:#DBEAFE;color:#1E40AF;">Active</span>
+          <span style="font-size:11px;color:var(--text-tertiary);">Main · claude-opus-4</span>
+        </div>
+      </div>
+      <button class="popup-close">×</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="popup-tabs">
+      <a href="popup-info.html" class="popup-tab" style="text-decoration:none;">정보</a>
+      <button class="popup-tab active">CLI</button>
+      <a href="popup-chat.html" class="popup-tab" style="text-decoration:none;">대화</a>
+      <a href="popup-log.html" class="popup-tab" style="text-decoration:none;">로그</a>
+      <a href="popup-note.html" class="popup-tab" style="text-decoration:none;">노트</a>
+    </div>
+
+    <!-- Content: CLI -->
+    <div class="popup-content">
+      <!-- Toolbar -->
+      <div class="terminal-toolbar">
+        <div class="terminal-session-info">
+          <span class="terminal-session-badge">cm-main-001</span>
+          <span class="terminal-status-dot"></span>
+          <span class="terminal-status-label">Connected</span>
+        </div>
+        <div class="terminal-toolbar-actions">
+          <button class="terminal-toolbar-btn" title="Clear">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+          </button>
+          <button class="terminal-toolbar-btn" title="Copy">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button class="terminal-toolbar-btn" title="Fullscreen">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Terminal -->
+      <div class="terminal-view">
+        <div class="terminal-header">
+          <div class="terminal-dot red"></div>
+          <div class="terminal-dot yellow"></div>
+          <div class="terminal-dot green"></div>
+          <span class="terminal-session-name">cm-main-001 — bash</span>
+        </div>
+        <div class="terminal-body">
+          <div class="terminal-line"><span class="comment"># TMUX Session: cm-main-001</span></div>
+          <div class="terminal-line"><span class="comment"># Agent: Main</span></div>
+          <div class="terminal-separator"></div>
+          <div class="terminal-line"><span class="prompt">$</span> <span class="cmd">claude</span> <span class="flag">--model</span> opus <span class="string">"프로젝트 현황 보고"</span></div>
+          <div class="terminal-line"><span class="output">현재 프로젝트 현황을 보고드립니다...</span></div>
+          <div class="terminal-line"><span class="output"></span></div>
+          <div class="terminal-line"><span class="info">  [Dev Part]</span> <span class="output">60% 완료 — 프론트엔드 UI 작업 중</span></div>
+          <div class="terminal-line"><span class="info">  [Design Part]</span> <span class="dim">리서치 완료, 대기 중</span></div>
+          <div class="terminal-line"><span class="info">  [QA Part]</span>  <span class="string">테스트 계획 승인 대기</span></div>
+          <div class="terminal-line"><span class="output"></span></div>
+          <div class="terminal-line"><span class="success">✓ 보고 완료</span> <span class="dim">(tokens: 2,450 / cost: $0.12)</span></div>
+          <div class="terminal-separator"></div>
+          <div class="terminal-line"><span class="prompt">$</span> <span class="cmd">claude</span> <span class="string">"QA Part 승인 요청 확인해줘"</span></div>
+          <div class="terminal-line"><span class="output">QA Part에서 승인 요청이 1건 있습니다:</span></div>
+          <div class="terminal-line"><span class="output"></span></div>
+          <div class="terminal-line"><span class="string">  [승인 요청] 통합 테스트 시나리오 30건 실행</span></div>
+          <div class="terminal-line"><span class="dim">  예상 비용: $2.40 | 요청 시간: 14:15</span></div>
+          <div class="terminal-line"><span class="output"></span></div>
+          <div class="terminal-line"><span class="output">승인하시겠습니까? </span><span class="dim">(approve/reject/modify)</span></div>
+          <div class="terminal-line"><span class="prompt">$</span> <span class="cmd">approve</span></div>
+          <div class="terminal-line"><span class="success">✓ 승인 완료</span></div>
+
+          <!-- Input -->
+          <div class="terminal-input-row">
+            <span class="terminal-input-prompt">$</span>
+            <input class="terminal-input" placeholder="" autofocus />
+            <div class="terminal-cursor"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<a class="back-link" href="dashboard-prototype.html">← 대시보드로 돌아가기</a>
+
+</body>
+</html>

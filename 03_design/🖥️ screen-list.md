@@ -36,93 +36,46 @@
 
 ---
 
-## 2. 워크스페이스 도메인 (데스크톱 전용)
+## 2. 대시보드 도메인 (메인 화면)
 
-### SCR-OFFICE-001. 빈 워크스페이스 (온보딩)
-- **스토리보드**: SB-003
-- **URL**: `/office`
-- **관련 기능**: F008, F013, F018, F028, F059
+> **변경 이력**: Phase 2(2026-04-16)에서 3D 워크스페이스(SCR-OFFICE-001~005)를 폐기하고 SugarCRM 4컬럼 대시보드로 교체.
+
+### SCR-DASH-001. 4컬럼 대시보드 (메인 화면)
+- **스토리보드**: SB-003, SB-004 대체
+- **URL**: `/dashboard`
+- **관련 기능**: F008, F009~F014, F018~F020, F023, F026, F028, F029, F040, F044, F046, F059~F062
 - **컴포넌트**:
-  - `OfficeCanvas`: React Three Fiber Canvas (3D 씬)
-    - `OfficeScene`: 전체 워크스페이스 환경 (바닥, 라이팅, 스카이돔)
-    - `MyDesk`: 나의 데스크 공간 + 나의 아바타
-    - `MainCharacter`: Main(비서실장) 캐릭터 + 대기 모션 + 말풍선
-    - `EmptySpaces`: 점선 테두리 부서 예정지
-  - `TopNav`: 상단 내비게이션 바
-  - `PartTabs`: Part 탭 바 ("아직 부서가 없습니다" 안내)
-  - `BottomBar`: 에이전트 수, 비용, 헬스 요약
-  - `NotificationPermission`: 브라우저 알림 권한 요청
+  - `WorkspaceLayout`: 4컬럼 레이아웃 컨테이너
+    - `ProjectColumn`: 프로젝트 카드 목록 + 우선순위 배지 + 드래그 재정렬
+    - `AgentColumn`: 에이전트 트리 (Main → Part → Sub → Instance) + 상태 배지
+    - `ActivityColumn`: 실시간 활동 피드 + 승인 요청 카드
+    - `ChatColumn`: Main과 실시간 대화 (프로젝트 구성 단계)
+  - `TopNav`: 상단 내비게이션 (Dashboard / Resources / Settings)
+  - 공용 카드 컴포넌트 (`cards.tsx`): MainAgentCard, PartCard, AgentCard, TaskCard, StatusDot, ColumnHeader, ColumnEmpty
 - **데이터 소스**:
   - `GET /api/agents/tree` (에이전트 트리)
-  - WebSocket: `agent:status` 이벤트
-- **상태 관리**: `useOfficeStore` (카메라 위치, 선택된 캐릭터), `useAgentStore` (에이전트 트리)
-- **반응형**: 데스크톱 전용 (1024px 이상)
+  - `GET /api/parts` (Part 목록)
+  - `GET /api/chat/messages` (Main 대화)
+  - WebSocket: `agent:status`, `agent:message`, `project:progress`, `approval:request`, `chat:message`, `chat:stream`
+- **상태 관리**: `useWorkspaceStore`, `useAgentStore`, `usePartStore`, `useChatStore`, `useApprovalStore`
+- **반응형**: 데스크톱 전용 (1024px 이상, 태블릿은 2컬럼 반응형)
 - **접근 권한**: 인증 필수
-
-### SCR-OFFICE-002. 워크스페이스 (부서 활동)
-- **스토리보드**: SB-004
-- **URL**: `/office`
-- **관련 기능**: F009~F014, F018~F020, F040, F044, F046, F059~F062
-- **컴포넌트**:
-  - `OfficeCanvas` + 하위 3D 컴포넌트
-    - `DepartmentSpace`: Part별 부서 공간 (고유 색상 카펫, 간판)
-    - `TeamArea`: Sub별 팀 구역 (책상, 캐릭터)
-    - `AgentCharacter`: 에이전트 캐릭터 (상태별 모션, 말풍선)
-    - `StatusEffects`: 상태 아이콘 (빌보드 스프라이트)
-    - `ParticleSystem`: 완료/오류 파티클 이펙트
-  - `TopNav`, `PartTabs`, `BottomBar`
-  - `SplitView`: 워크스페이스 + 채팅 분할 뷰 (드래그 조절)
-- **데이터 소스**:
-  - `GET /api/agents/tree`
-  - `GET /api/parts`
-  - WebSocket: `agent:status`, `agent:message`, `project:progress`
-- **상태 관리**: `useOfficeStore`, `useAgentStore`, `usePartStore`
-- **반응형**: 데스크톱 전용
-
-### SCR-OFFICE-003. 승인 대기 상태
-- **스토리보드**: SB-005
-- **URL**: `/office` (SB-004 상태 변형)
-- **관련 기능**: F023, F026, F028, F029
-- **컴포넌트**:
-  - SB-004 기반 + 추가:
-    - `PendingAnimation`: Main 캐릭터 내 데스크 옆으로 이동 + 어깨 톡톡 모션
-    - `ApprovalBadge`: 상단 알림 배지 (펄스 애니메이션)
-    - `ApprovalBanner`: "승인 대기 N건" 배너
-- **데이터 소스**: WebSocket: `approval:request`
-- **상태 관리**: `useApprovalStore` (대기 목록)
-
-### SCR-OFFICE-004. 서버 복구 애니메이션
-- **스토리보드**: SB-006
-- **URL**: `/office` (자동 전환)
-- **관련 기능**: F042, F043, F074
-- **컴포넌트**:
-  - `RecoveryScene`: 정전 -> 순차 점등 애니메이션
-  - `RecoveryProgress`: 하단 바 복구 프로그레스 바
-  - `CharacterRevival`: 캐릭터 순차 등장 + "복구됨" 말풍선
-- **데이터 소스**: WebSocket: `system:recovery`
-- **상태 관리**: `useSystemStore` (복구 상태)
-
-### SCR-OFFICE-005. 부서 건축 애니메이션
-- **스토리보드**: SB-011
-- **URL**: `/office` (Skill 실행 후 자동 전환)
-- **관련 기능**: F001, F009
-- **컴포넌트**:
-  - `ConstructionAnimation`: 건축 시퀀스 (공사 표지판 -> 망치질 -> 카펫 -> 파티션 -> 가구 -> 부서장 등장)
-  - `ConstructionWorkers`: 미니 건설 캐릭터
-  - `CompletionEffect`: 완성 파티클 + 말풍선
-- **데이터 소스**: WebSocket: `part:created`
+- **인터랙션**:
+  - Projects 컬럼: 프로젝트 카드 클릭 → 상세 모달, 우선순위 드래그 재정렬
+  - Agents 컬럼: 에이전트 카드 클릭 → AgentModal (대화/노트/로그/CLI 탭)
+  - Activity 컬럼: 실시간 피드 자동 스크롤, 승인 요청 인라인 처리
+  - Chat 컬럼: Main과 직접 대화, Skill 실행 트리거
 
 ---
 
-## 3. 채팅 도메인 (워크스페이스 내 팝업)
+## 3. 채팅 도메인 (대시보드 Chat 컬럼 + 에이전트 팝업 대화 탭)
 
-### SCR-CHAT-001. 일반 대화 (채팅 팝업)
+### SCR-CHAT-001. Main 대화 (Chat 컬럼)
 - **스토리보드**: SB-007
-- **URL**: 없음 (워크스페이스 내 팝업 — Main 캐릭터에 접촉 시 열림)
+- **URL**: `/dashboard` (Chat 컬럼 내장)
 - **관련 기능**: F008, F059~F061
 - **컴포넌트**:
-  - `ChatPopup`: 워크스페이스 우측 슬라이드 팝업
-    - `ChatHeader`: Main 아이콘 + 이름 + 연결 상태
+  - `ChatColumn`: 대시보드 4번째 컬럼
     - `MessageList`: 메시지 목록 (무한 스크롤)
       - `UserMessage`: 대표 메시지 말풍선 (우측, 퍼플)
       - `MainMessage`: Main 메시지 말풍선 (좌측, 흰색)
@@ -132,16 +85,16 @@
     - `InlineProgressCard`: 진행률 카드 (인라인)
 - **데이터 소스**:
   - `GET /api/chat/messages?page=N`
-  - WebSocket: `chat:message`, `chat:typing`
+  - WebSocket: `chat:message`, `chat:typing`, `chat:stream`
   - `POST /api/chat/send`
 - **상태 관리**: `useChatStore` (메시지 목록, 입력 상태)
 - **반응형**:
-  - 데스크톱: 워크스페이스 내 팝업 (최대 너비 800px). 분할 뷰 가능
+  - 데스크톱: 대시보드 4번째 컬럼 (고정)
   - 모바일: 전체 너비 (별도 화면)
 
-### SCR-CHAT-002. 승인 요청 채팅 (채팅 팝업)
+### SCR-CHAT-002. 승인 요청 채팅 (Chat 컬럼 내)
 - **스토리보드**: SB-008
-- **URL**: 없음 (채팅 팝업 내 승인 요청 수신 시 상태)
+- **URL**: `/dashboard` (Chat 컬럼 내 승인 요청 수신 시 상태)
 - **관련 기능**: F023~F030, F059, F061
 - **컴포넌트**:
   - SB-007 기반 + 추가:
@@ -194,9 +147,13 @@
 
 ---
 
-## 5. 에이전트 상세 도메인 (팝업 모달)
+## 5. 에이전트 상세 도메인 (Sub CLI 주 대화 접점)
 
-### SCR-AGENT-001. 에이전트 팝업 - 대화 탭
+> **DR001 반영 (참조: [02_concept/📌 DR001-yj-manager-hierarchy.md](../02_concept/📌%20DR001-yj-manager-hierarchy.md))**
+> 이 도메인의 4개 탭(대화/노트/로그/터미널)은 **"팝업 부가 정보"가 아니라 프로젝트 수행 중 사용자가 Sub CLI와 직접 상호작용하는 주 창구**다. Main CLI(채팅 컬럼)는 초기 프로젝트 구성 단계에서만 사용되고, 일단 Sub가 생성된 이후에는 사용자는 **이 에이전트 상세 모달을 통해 해당 Sub CLI와 직접 대화·관찰·개입**한다. 웹 대시보드 본체는 여러 Sub의 상태를 감독·집계하는 뷰일 뿐이다.
+
+### SCR-AGENT-001. 에이전트 팝업 - 대화 탭 (Sub CLI 주 대화 접점)
+- **성격**: **프로젝트 수행 중 사용자의 주 대화 접점**. DR001 §3/§4에 따라 Main은 초기 구성만 담당하고, 구성 이후 사용자는 이 탭을 통해 해당 Sub CLI와 직접 대화한다. (참조: [DR001](../02_concept/📌%20DR001-yj-manager-hierarchy.md) §4 사용 흐름 2단계)
 - **스토리보드**: SB-012
 - **URL**: 모달 (별도 URL 없음)
 - **관련 기능**: F012, F014, F015, F040, F057, F062, F063
@@ -205,15 +162,19 @@
     - `AgentHeader`: 캐릭터 아이콘 + 이름 + 역할 + 상태 배지 + 가동 시간
     - `TabBar`: 대화 / 노트 / 로그 / 터미널 탭
   - `ConversationTab`:
-    - `ConversationTimeline`: 시간순 대화 이력
+    - `ConversationTimeline`: 시간순 대화 이력 (사용자 ↔ Sub CLI)
     - `ConversationItem`: 시각 + 보낸이 -> 받는이 + 내용 + 유형 아이콘
+    - `UserInputArea`: 사용자가 Sub CLI에 직접 메시지를 보낼 수 있는 입력 영역
 - **데이터 소스**:
   - `GET /api/agents/:id`
   - `GET /api/agents/:id/conversations`
+  - `POST /api/agents/:id/messages` (사용자 ↔ Sub 직접 대화)
+  - WebSocket: `agent:message`
 - **상태 관리**: `useAgentDetailStore` (선택된 에이전트, 활성 탭)
 - **반응형**: 데스크톱 전용
 
-### SCR-AGENT-002. 에이전트 팝업 - 노트 탭
+### SCR-AGENT-002. 에이전트 팝업 - 노트 탭 (Sub 상태·진실 소스 열람)
+- **성격**: **Sub CLI의 진실 소스(`.orchestrator/*.md`)를 그대로 열람**하는 뷰. 대화 탭(SCR-AGENT-001)과 함께 Sub와의 주 접점 한 축을 담당한다. DR001 §5에 따라 Sub의 `data(파일)`가 진실 소스이므로, 이 탭의 내용이 곧 Sub의 현재 사고 맥락이다. (참조: [DR001](../02_concept/📌%20DR001-yj-manager-hierarchy.md) §5)
 - **스토리보드**: SB-013
 - **URL**: 모달 내 탭
 - **관련 기능**: F040, F041, F062
@@ -222,13 +183,14 @@
     - `NoteRenderer`: react-markdown + remark-gfm 렌더링
     - `ProgressTimeline`: 단계별 타임라인 (색상 코딩)
     - `DecisionCards`: 의사결정 카드 (아코디언)
-    - `NoteFileList`: 노트 파일 목록
+    - `NoteFileList`: 노트 파일 목록 (Sub의 `.orchestrator/` 구조)
 - **데이터 소스**:
   - `GET /api/agents/:id/notes`
   - WebSocket: `note:updated`
 - **상태 관리**: `useAgentDetailStore`
 
-### SCR-AGENT-003. 에이전트 팝업 - 로그 탭
+### SCR-AGENT-003. 에이전트 팝업 - 로그 탭 (Sub 이벤트 흐름 추적)
+- **성격**: Sub CLI가 생성한 **이벤트 로그 시계열** 뷰. 대화 탭이 "주 대화"라면 이 탭은 "주 관찰" 창구다. Sub 실행 중 발생한 Hook 이벤트·툴 호출·오류가 시간순으로 흐른다. (참조: [DR001](../02_concept/📌%20DR001-yj-manager-hierarchy.md) §4 사용 흐름 2단계)
 - **스토리보드**: SB-014
 - **URL**: 모달 내 탭
 - **관련 기능**: F034, F062, F063
@@ -242,18 +204,18 @@
   - `GET /api/agents/:id/logs?search=&page=`
   - WebSocket: `log:new`
 
-### SCR-AGENT-004. 에이전트 팝업 - 터미널 탭
+### SCR-AGENT-004. 에이전트 팝업 - 터미널 탭 (Terminal.app으로 CLI 세션 열기)
+- **성격**: Sub CLI(`claude` 프로세스)의 **세션을 macOS Terminal.app에서 직접 여는** 탭. 대화 탭이 구조화된 메시지라면, 이 탭은 **원시 CLI 레벨의 직접 접점**이다. 오류 진단·세션 개입이 필요할 때 쓰는 최말단 채널. (참조: [DR001](../02_concept/📌%20DR001-yj-manager-hierarchy.md) §3 Sub 행)
 - **스토리보드**: SB-015
 - **URL**: 모달 내 탭
 - **관련 기능**: F015, F057, F058
 - **컴포넌트**:
   - `TerminalTab`:
-    - `XTermTerminal`: xterm.js 터미널 뷰 (어두운 배경)
-    - `StdinInput`: stdin 입력창 + 전송 버튼
-    - `SessionStatus`: 세션 상태
+    - "터미널 열기" 버튼: 클릭 시 `POST /api/agents/:id/open-terminal` 호출
+    - `SessionStatus`: cliSessionId 존재 여부, 프로젝트 루트 경로 표시
 - **데이터 소스**:
-  - WebSocket: `terminal:output`, `terminal:input`
-- **상태 관리**: `useTerminalStore` (세션 ID, 연결 상태)
+  - `POST /api/agents/:id/open-terminal` (osascript로 Terminal.app 실행)
+- **상태 관리**: `useAgentDetailStore` (선택된 에이전트의 cliSessionId, projectRoot)
 
 ---
 
@@ -420,7 +382,35 @@
 
 ---
 
-## 10. 모바일 도메인
+## 10. 노트 뷰 도메인
+
+### SCR-NOTE-001. 노트 전체 화면 (새 탭)
+- **스토리보드**: SB-013 확장
+- **URL**: `/workspace/notes/:id`
+- **관련 기능**: F040, F041, F062
+- **프로토타입**: `page-note-view.html`
+- **컴포넌트**:
+  - `TopNav`: 상단 네비게이션 (Dashboard/Resources/Settings)
+  - `NoteBreadcrumb`: 경로 표시 (Dashboard / Notes / Agent / file.md)
+  - `NoteHeader`: 제목 + 편집/닫기 버튼
+  - `NoteMeta`: 수정 시각, 작성자, 파일 경로
+  - `NoteTags`: 태그 뱃지 (현황/결정/할일/오류 등)
+  - `NoteBody`: 마크다운 렌더링 (h2~h4, ul/ol, code, pre, blockquote, checkbox, img, pdf embed)
+  - `NoteFooter`: 마지막 편집자 + URL 표시
+- **데이터 소스**:
+  - `GET /api/agents/:agentId/notes/:noteId`
+  - WebSocket: `note:updated`
+- **상태 관리**: `useAgentDetailStore`
+- **반응형**: 데스크톱 전용 (900px max-width 콘텐츠 영역)
+- **접근 권한**: 인증 필수
+- **특이사항**:
+  - 팝업 노트 탭(SCR-AGENT-002)에서 "새 탭에서 열기" 버튼으로 진입
+  - URL 기반이므로 북마크, 공유, 브라우저 히스토리 지원
+  - 이미지 렌더링 지원 (Phase 1), PDF 인라인 뷰 지원 (Phase 2)
+
+---
+
+## 11. 모바일 도메인
 
 ### SCR-MOBILE-001. 모바일 채팅 화면
 - **스토리보드**: SB-026
@@ -468,13 +458,14 @@
 | 도메인 | 화면 수 | 화면 ID |
 |---|---|---|
 | 인증 | 2 | SCR-AUTH-001~002 |
-| 워크스페이스 | 5 | SCR-OFFICE-001~005 |
-| 채팅 (워크스페이스 내 팝업) | 2 | SCR-CHAT-001~002 |
+| 대시보드 | 1 | SCR-DASH-001 |
+| 채팅 (대시보드 Chat 컬럼) | 2 | SCR-CHAT-001~002 |
 | Skill | 2 | SCR-SKILL-001~002 |
 | 에이전트 상세 | 4 | SCR-AGENT-001~004 |
 | 리포트 | 3 | SCR-REPORT-001~003 |
 | 데이터 뷰 | 2 | SCR-DATA-001~002 |
 | 시스템 | 2 | SCR-SYSTEM-001~002 |
 | 설정 | 4 | SCR-SETTINGS-001~004 |
+| 노트 뷰 | 1 | SCR-NOTE-001 |
 | 모바일 | 3 | SCR-MOBILE-001~003 |
-| **합계** | **29** | |
+| **합계** | **26** | |

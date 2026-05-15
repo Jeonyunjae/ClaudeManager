@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YJ Manager — Resources</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg-page: #E8ECEF;
+    --bg-card: #FFFFFF;
+    --bg-content-card: #F3F5F7;
+    --text-primary: #10141A;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+    --border-light: #E5E7EB;
+    --accent-purple: #7C5CFC;
+    --accent-blue: #3B82F6;
+    --accent-mint: #34D399;
+    --accent-amber: #F59E0B;
+    --accent-coral: #E8606D;
+    --status-error: #EF4444;
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-size: 13px; line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* Top Nav */
+  .top-nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 56px;
+    background: rgba(232,236,239,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-light);
+  }
+  .nav-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+  .nav-logo-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--text-primary); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+  }
+  .nav-tabs { display: flex; align-items: center; gap: 0; }
+  .nav-tab {
+    padding: 6px 20px; border-radius: 20px;
+    font-size: 14px; font-weight: 500; color: var(--text-secondary);
+    cursor: pointer; border: none; background: transparent;
+    text-decoration: none; letter-spacing: -0.01em;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .nav-tab:hover { color: var(--text-primary); }
+  .nav-tab.active { background: var(--text-primary); color: white; font-weight: 600; }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .nav-icon-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: none; background: transparent; color: var(--text-secondary);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Content Card */
+  .content-card {
+    background: var(--bg-content-card);
+    border-radius: 20px;
+    margin: 16px 20px;
+    padding: 24px;
+    min-height: calc(100vh - 56px - 68px);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+  }
+
+  /* Sub Tabs */
+  .sub-tabs {
+    display: flex; gap: 2px; margin-bottom: 20px;
+    background: rgba(0,0,0,0.04); border-radius: 10px; padding: 3px;
+    width: fit-content;
+  }
+  .sub-tab {
+    padding: 7px 16px; border-radius: 8px; border: none;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    background: transparent; color: var(--text-secondary);
+    font-family: inherit; transition: all 0.15s;
+  }
+  .sub-tab.active { background: white; color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .sub-tab:hover:not(.active) { color: var(--text-primary); }
+
+  /* Gauge Cards */
+  .gauge-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+    margin-bottom: 24px;
+  }
+  .gauge-card {
+    background: var(--bg-card); border-radius: 14px;
+    box-shadow: var(--shadow-card); padding: 20px;
+    text-align: center;
+  }
+  .gauge-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; }
+  .gauge-svg { width: 100px; height: 100px; margin: 0 auto; }
+  .gauge-center-value { font-size: 22px; font-weight: 700; fill: var(--text-primary); }
+  .gauge-center-unit { font-size: 10px; fill: var(--text-tertiary); }
+  .gauge-detail {
+    display: flex; justify-content: space-around; margin-top: 12px;
+    font-size: 11px; color: var(--text-tertiary);
+  }
+  .gauge-detail-value { font-weight: 600; color: var(--text-primary); }
+  .gauge-warn { color: var(--status-error) !important; }
+
+  /* Cost Section */
+  .cost-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    margin-bottom: 24px;
+  }
+  .cost-card {
+    background: var(--bg-card); border-radius: 14px;
+    box-shadow: var(--shadow-card); padding: 20px;
+  }
+  .cost-card-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+
+  /* Summary Stats */
+  .stat-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--bg-card); border-radius: 12px;
+    box-shadow: var(--shadow-card); padding: 16px;
+  }
+  .stat-label { font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+  .stat-change {
+    font-size: 10px; margin-top: 4px; display: flex; align-items: center; gap: 3px;
+  }
+  .stat-change.up { color: var(--status-error); }
+  .stat-change.down { color: var(--accent-mint); }
+
+  /* Donut Chart */
+  .donut-container {
+    display: flex; align-items: center; justify-content: center; gap: 24px; padding: 8px 0;
+  }
+  .donut-svg { width: 110px; height: 110px; }
+  .donut-center-text { font-size: 18px; font-weight: 700; fill: var(--text-primary); }
+  .donut-center-label { font-size: 9px; fill: var(--text-tertiary); }
+  .donut-legend { display: flex; flex-direction: column; gap: 6px; }
+  .donut-legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .donut-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .donut-legend-value { font-weight: 600; margin-left: auto; }
+
+  /* Trend Chart */
+  .trend-chart {
+    display: flex; align-items: flex-end; gap: 6px; height: 100px; padding: 8px 4px 0;
+  }
+  .trend-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .trend-bar { width: 100%; border-radius: 4px 4px 0 0; transition: height 0.3s ease; }
+  .trend-bar-label { font-size: 9px; color: var(--text-tertiary); }
+  .trend-bar-value { font-size: 9px; color: var(--text-secondary); font-weight: 600; }
+
+  /* Data Table */
+  .data-section {
+    background: var(--bg-card); border-radius: 14px;
+    box-shadow: var(--shadow-card); padding: 20px;
+    margin-bottom: 16px;
+  }
+  .data-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+  }
+  .data-title { font-size: 14px; font-weight: 600; }
+  .data-filter { display: flex; gap: 6px; align-items: center; }
+  .data-filter-btn {
+    padding: 4px 10px; border-radius: 6px; border: none;
+    font-size: 10px; font-weight: 500; cursor: pointer;
+    background: #F3F4F6; color: var(--text-secondary);
+  }
+  .data-filter-btn.active { background: var(--accent-purple); color: white; }
+  .data-search {
+    padding: 5px 10px; border-radius: 6px;
+    border: 1px solid var(--border-light); font-size: 11px;
+    outline: none; width: 140px; font-family: inherit;
+  }
+
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    text-align: left; font-size: 10px; font-weight: 600;
+    color: var(--text-tertiary); text-transform: uppercase;
+    letter-spacing: 0.04em; padding: 8px 10px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .data-table td {
+    padding: 10px; font-size: 12px; border-bottom: 1px solid #F9FAFB; vertical-align: middle;
+  }
+  .data-table tr:hover td { background: #FAFBFC; }
+
+  .event-badge {
+    font-size: 9px; font-weight: 500; padding: 2px 8px;
+    border-radius: 10px; display: inline-block;
+  }
+  .event-badge.approved { background: #D1FAE5; color: #065F46; }
+  .event-badge.rejected { background: #FEE2E2; color: #991B1B; }
+  .event-badge.modified { background: #FEF3C7; color: #92400E; }
+  .event-badge.error { background: #FEE2E2; color: #991B1B; }
+  .event-badge.resolved { background: #DBEAFE; color: #1E40AF; }
+
+  .pagination {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 12px; font-size: 11px; color: var(--text-tertiary);
+  }
+  .pagination-btns { display: flex; gap: 4px; }
+  .pagination-btn {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: 1px solid var(--border-light); background: white;
+    font-size: 11px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; color: var(--text-secondary);
+  }
+  .pagination-btn.active { background: var(--accent-purple); color: white; border-color: var(--accent-purple); }
+</style>
+</head>
+<body>
+
+<!-- Top Nav -->
+<nav class="top-nav">
+  <div class="nav-logo">
+    <div class="nav-logo-icon">YJ</div>
+    YJ Manager
+  </div>
+  <div class="nav-tabs">
+    <a href="dashboard-prototype.html" class="nav-tab" style="text-decoration:none;">Dashboard</a>
+    <button class="nav-tab active">Resources</button>
+    <a href="page-settings.html" class="nav-tab" style="text-decoration:none;">Settings</a>
+  </div>
+  <div class="nav-right">
+    <button class="nav-icon-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    </button>
+    <div style="width:32px;height:32px;border-radius:50%;background:#E5E7EB;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#6B7280;">YJ</div>
+  </div>
+</nav>
+
+<div class="content-card">
+
+  <!-- Sub Tabs -->
+  <div class="sub-tabs">
+    <button class="sub-tab active" onclick="showPanel('health')">System Health</button>
+    <button class="sub-tab" onclick="showPanel('cost')">Cost</button>
+    <button class="sub-tab" onclick="showPanel('approval')">Approvals</button>
+    <button class="sub-tab" onclick="showPanel('error')">Error Log</button>
+    <button class="sub-tab" onclick="showPanel('audit')">Audit Log</button>
+  </div>
+
+  <!-- System Health -->
+  <div id="panel-health">
+    <div class="gauge-grid">
+      <!-- CPU -->
+      <div class="gauge-card">
+        <div class="gauge-title">CPU</div>
+        <svg class="gauge-svg" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#F3F4F6" stroke-width="10"/>
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#F59E0B" stroke-width="10"
+            stroke-dasharray="163 151" stroke-dashoffset="-78.5"
+            stroke-linecap="round" transform="rotate(-90 60 60)"/>
+          <text x="60" y="56" text-anchor="middle" class="gauge-center-value">52%</text>
+          <text x="60" y="70" text-anchor="middle" class="gauge-center-unit">In Use</text>
+        </svg>
+        <div class="gauge-detail">
+          <div>Cores: <span class="gauge-detail-value">4</span></div>
+          <div>Load: <span class="gauge-detail-value">2.08</span></div>
+        </div>
+      </div>
+      <!-- Memory -->
+      <div class="gauge-card">
+        <div class="gauge-title">Memory</div>
+        <svg class="gauge-svg" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#F3F4F6" stroke-width="10"/>
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#EF4444" stroke-width="10"
+            stroke-dasharray="302 12" stroke-dashoffset="-78.5"
+            stroke-linecap="round" transform="rotate(-90 60 60)"/>
+          <text x="60" y="56" text-anchor="middle" class="gauge-center-value gauge-warn">96%</text>
+          <text x="60" y="70" text-anchor="middle" class="gauge-center-unit">In Use</text>
+        </svg>
+        <div class="gauge-detail">
+          <div>Total: <span class="gauge-detail-value">16 GB</span></div>
+          <div>Used: <span class="gauge-detail-value gauge-warn">15.4 GB</span></div>
+        </div>
+      </div>
+      <!-- Disk -->
+      <div class="gauge-card">
+        <div class="gauge-title">Disk</div>
+        <svg class="gauge-svg" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#F3F4F6" stroke-width="10"/>
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#34D399" stroke-width="10"
+            stroke-dasharray="22 292" stroke-dashoffset="-78.5"
+            stroke-linecap="round" transform="rotate(-90 60 60)"/>
+          <text x="60" y="56" text-anchor="middle" class="gauge-center-value">7%</text>
+          <text x="60" y="70" text-anchor="middle" class="gauge-center-unit">In Use</text>
+        </svg>
+        <div class="gauge-detail">
+          <div>Total: <span class="gauge-detail-value">500 GB</span></div>
+          <div>Used: <span class="gauge-detail-value">35 GB</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-label">Today Cost</div>
+      <div class="stat-value" style="color:var(--accent-purple);">$12.40</div>
+      <div class="stat-change up">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+        +18% vs yesterday
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Monthly Cost</div>
+      <div class="stat-value">$48.20</div>
+      <div class="stat-change down">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/></svg>
+        -5% vs last month
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Remaining</div>
+      <div class="stat-value" style="color:var(--accent-mint);">$51.80</div>
+      <div class="stat-change" style="color:var(--text-tertiary);">Limit: $100.00</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Tokens</div>
+      <div class="stat-value">1.2M</div>
+      <div class="stat-change" style="color:var(--text-tertiary);">Input 980K / Output 220K</div>
+    </div>
+  </div>
+
+  <!-- Cost Charts -->
+  <div class="cost-grid">
+    <div class="cost-card">
+      <div class="cost-card-title">Model Usage</div>
+      <div class="donut-container">
+        <svg class="donut-svg" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="45" fill="none" stroke="#7C5CFC" stroke-width="14" stroke-dasharray="170 113" stroke-dashoffset="-20"/>
+          <circle cx="60" cy="60" r="45" fill="none" stroke="#3B82F6" stroke-width="14" stroke-dasharray="56.5 226.5" stroke-dashoffset="-190"/>
+          <circle cx="60" cy="60" r="45" fill="none" stroke="#34D399" stroke-width="14" stroke-dasharray="28.3 254.9" stroke-dashoffset="-246.5"/>
+          <text x="60" y="57" text-anchor="middle" class="donut-center-text">$48</text>
+          <text x="60" y="70" text-anchor="middle" class="donut-center-label">This Month</text>
+        </svg>
+        <div class="donut-legend">
+          <div class="donut-legend-item"><div class="donut-legend-dot" style="background:var(--accent-purple);"></div>Opus <span class="donut-legend-value">$36.20</span></div>
+          <div class="donut-legend-item"><div class="donut-legend-dot" style="background:var(--accent-blue);"></div>Sonnet <span class="donut-legend-value">$9.80</span></div>
+          <div class="donut-legend-item"><div class="donut-legend-dot" style="background:var(--accent-mint);"></div>Haiku <span class="donut-legend-value">$2.20</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cost-card">
+      <div class="cost-card-title">Daily Cost Trend</div>
+      <div class="trend-chart">
+        <div class="trend-bar-wrap"><div class="trend-bar-value">$8.2</div><div class="trend-bar" style="height:55px;background:var(--accent-purple);"></div><div class="trend-bar-label">4/10</div></div>
+        <div class="trend-bar-wrap"><div class="trend-bar-value">$6.4</div><div class="trend-bar" style="height:43px;background:var(--accent-purple);"></div><div class="trend-bar-label">4/11</div></div>
+        <div class="trend-bar-wrap"><div class="trend-bar-value">$9.1</div><div class="trend-bar" style="height:61px;background:var(--accent-purple);"></div><div class="trend-bar-label">4/12</div></div>
+        <div class="trend-bar-wrap"><div class="trend-bar-value">$5.8</div><div class="trend-bar" style="height:39px;background:var(--accent-purple);"></div><div class="trend-bar-label">4/13</div></div>
+        <div class="trend-bar-wrap"><div class="trend-bar-value">$7.3</div><div class="trend-bar" style="height:49px;background:var(--accent-purple);"></div><div class="trend-bar-label">4/14</div></div>
+        <div class="trend-bar-wrap"><div class="trend-bar-value">$10.5</div><div class="trend-bar" style="height:70px;background:var(--accent-purple);"></div><div class="trend-bar-label">4/15</div></div>
+        <div class="trend-bar-wrap"><div class="trend-bar-value">$12.4</div><div class="trend-bar" style="height:83px;background:linear-gradient(to top, var(--accent-purple), var(--accent-blue));"></div><div class="trend-bar-label">4/16</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Approval History -->
+  <div class="data-section">
+    <div class="data-header">
+      <div class="data-title">Approval History</div>
+      <div class="data-filter">
+        <button class="data-filter-btn active">All</button>
+        <button class="data-filter-btn">Approved</button>
+        <button class="data-filter-btn">Rejected</button>
+        <button class="data-filter-btn">Modified</button>
+        <input class="data-search" placeholder="Search..." />
+      </div>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Time</th><th>Requester</th><th>Description</th><th>Result</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr>
+          <td style="color:var(--text-tertiary);white-space:nowrap;">04/16 14:15</td>
+          <td>QA Part</td>
+          <td>Run 30 integration test scenarios</td>
+          <td><span class="event-badge" style="background:#FEF3C7;color:#92400E;">Pending</span></td>
+          <td style="font-size:11px;">$2.40</td>
+        </tr>
+        <tr>
+          <td style="color:var(--text-tertiary);white-space:nowrap;">04/15 16:30</td>
+          <td>Dev Part</td>
+          <td>Create 2 additional frontend Sub agents</td>
+          <td><span class="event-badge approved">Approved</span></td>
+          <td style="font-size:11px;">$4.80</td>
+        </tr>
+        <tr>
+          <td style="color:var(--text-tertiary);white-space:nowrap;">04/14 11:20</td>
+          <td>Design Part</td>
+          <td>External API research (100 calls)</td>
+          <td><span class="event-badge modified">Modified</span></td>
+          <td style="font-size:11px;">$1.20</td>
+        </tr>
+        <tr>
+          <td style="color:var(--text-tertiary);white-space:nowrap;">04/13 09:45</td>
+          <td>Dev Part</td>
+          <td>Full DB schema redesign</td>
+          <td><span class="event-badge rejected">Rejected</span></td>
+          <td style="font-size:11px;">—</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="pagination">
+      <span>1-4 / 12</span>
+      <div class="pagination-btns">
+        <button class="pagination-btn active">1</button>
+        <button class="pagination-btn">2</button>
+        <button class="pagination-btn">3</button>
+        <button class="pagination-btn"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Log -->
+  <div class="data-section">
+    <div class="data-header">
+      <div class="data-title">Error Log</div>
+      <div class="data-filter"><input class="data-search" placeholder="Search errors..." /></div>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Time</th><th>Agent</th><th>Error</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr>
+          <td style="color:var(--text-tertiary);white-space:nowrap;">04/16 14:02</td>
+          <td>Tester</td>
+          <td>E2E test failed — timeout 30s exceeded</td>
+          <td><span class="event-badge error">Unresolved</span></td>
+        </tr>
+        <tr>
+          <td style="color:var(--text-tertiary);white-space:nowrap;">04/15 22:10</td>
+          <td>API Developer</td>
+          <td>DB connection pool exhausted — max_connections exceeded</td>
+          <td><span class="event-badge resolved">Resolved</span></td>
+        </tr>
+        <tr>
+          <td style="color:var(--text-tertiary);white-space:nowrap;">04/14 08:30</td>
+          <td>Main</td>
+          <td>WebSocket disconnected — auto reconnect success</td>
+          <td><span class="event-badge resolved">Resolved</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="pagination">
+      <span>1-3 / 3</span>
+      <div class="pagination-btns"><button class="pagination-btn active">1</button></div>
+    </div>
+  </div>
+
+  <!-- Audit Log -->
+  <div class="data-section">
+    <div class="data-header">
+      <div class="data-title">Audit Log</div>
+      <div class="data-filter">
+        <button class="data-filter-btn active">All</button>
+        <button class="data-filter-btn">Create</button>
+        <button class="data-filter-btn">Update</button>
+        <button class="data-filter-btn">Delete</button>
+        <input class="data-search" placeholder="Search..." />
+      </div>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Time</th><th>Actor</th><th>Event</th><th>Target</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr>
+          <td style="color:var(--text-tertiary);white-space:nowrap;">04/16 14:32</td>
+          <td>Main</td>
+          <td><span class="event-badge" style="background:#DBEAFE;color:#1E40AF;">Dispatch</span></td>
+          <td>UI Builder</td>
+          <td style="font-size:11px;color:var(--text-secondary);">Card layout task started</td>
+        </tr>
+        <tr>
+          <td style="color:var(--text-tertiary);white-space:nowrap;">04/16 14:15</td>
+          <td>QA Part</td>
+          <td><span class="event-badge" style="background:#FEF3C7;color:#92400E;">Approval Request</span></td>
+          <td>Main</td>
+          <td style="font-size:11px;color:var(--text-secondary);">30 integration tests approval requested</td>
+        </tr>
+        <tr>
+          <td style="color:var(--text-tertiary);white-space:nowrap;">04/16 09:00</td>
+          <td>System</td>
+          <td><span class="event-badge" style="background:#D1FAE5;color:#065F46;">Start</span></td>
+          <td>All</td>
+          <td style="font-size:11px;color:var(--text-secondary);">Session started — 8 agents restored</td>
+        </tr>
+        <tr>
+          <td style="color:var(--text-tertiary);white-space:nowrap;">04/15 23:00</td>
+          <td>System</td>
+          <td><span class="event-badge" style="background:#F3F4F6;color:var(--text-secondary);">Backup</span></td>
+          <td>DB</td>
+          <td style="font-size:11px;color:var(--text-secondary);">Auto backup completed — 23.8 MB</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="pagination">
+      <span>1-4 / 156</span>
+      <div class="pagination-btns">
+        <button class="pagination-btn active">1</button>
+        <button class="pagination-btn">2</button>
+        <button class="pagination-btn">3</button>
+        <button class="pagination-btn">...</button>
+        <button class="pagination-btn">8</button>
+        <button class="pagination-btn"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

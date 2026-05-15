@@ -41,6 +41,7 @@ export const agents = pgTable('agents', {
   taskType: text('task_type'),
   statusMessage: text('status_message'),
   notesPath: text('notes_path'),
+  projectRoot: text('project_root'),
   startedAt: text('started_at'),
   stoppedAt: text('stopped_at'),
   createdAt: text('created_at').notNull().default(sql`now()::text`),

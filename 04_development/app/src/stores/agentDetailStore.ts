@@ -62,6 +62,8 @@ type AgentDetailState = {
   isOpen: boolean;
   isLoading: boolean;
   isSending: boolean;
+  sendingAgents: Set<string>;
+  isAgentSending: (agentId: string) => boolean;
   openAgent: (agentId: string) => Promise<void>;
   closeAgent: () => void;
   setActiveTab: (tab: ActiveTab) => void;
@@ -74,6 +76,7 @@ type AgentDetailState = {
   sendMessage: (agentId: string, content: string, attachments?: { filename: string; path: string; type: string }[]) => Promise<void>;
   cancelChat: (agentId: string) => Promise<void>;
   receiveWsMessage: (message: { id: string; sender: string; content: string; messageType: string; agentId: string }) => void;
+  receiveWsStream: (data: { agentId: string; responseMsgId: string; content: string }) => void;
   receiveWsTyping: (data: { agentId: string; isTyping: boolean }) => void;
   addConversation: (conv: AgentConversation) => void;
   updateNote: (file: string, content: string) => void;
@@ -101,6 +104,11 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
   isOpen: false,
   isLoading: false,
   isSending: false,
+  sendingAgents: new Set<string>(),
+
+  isAgentSending: (agentId: string) => {
+    return get().sendingAgents.has(agentId);
+  },
 
   openAgent: async (agentId) => {
     set({ isOpen: true, isLoading: true, activeTab: 'info' });
@@ -236,8 +244,10 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
   },
 
   sendMessage: async (agentId, content, attachments) => {
-    if (!content.trim() || get().isSending) return;
-    set({ isSending: true });
+    if (!content.trim() || get().sendingAgents.has(agentId)) return;
+    const newSending = new Set(get().sendingAgents);
+    newSending.add(agentId);
+    set({ isSending: true, sendingAgents: newSending });
 
     const attachmentLabel = attachments && attachments.length > 0
       ? `\n\n📎 ${attachments.map(a => a.filename).join(', ')}`
@@ -268,7 +278,9 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
 
       // isSending stays true — will be cleared when WS response arrives
     } catch {
-      set({ isSending: false });
+      const errSending = new Set(get().sendingAgents);
+      errSending.delete(agentId);
+      set({ isSending: errSending.size > 0, sendingAgents: errSending });
       const errMsg: AgentConversation = {
         id: `err-${Date.now()}`,
         timestamp: new Date().toISOString(),
@@ -284,18 +296,21 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
   cancelChat: async (agentId) => {
     try {
       await apiClient.post(`/api/agents/${agentId}/cancel-chat`, {});
-      set({ isSending: false });
     } catch {
-      set({ isSending: false });
+      // ignore
     }
+    const s = new Set(get().sendingAgents);
+    s.delete(agentId);
+    set({ isSending: s.size > 0, sendingAgents: s });
   },
 
   /**
    * Called when a WebSocket chat:message arrives with the agent's response.
    */
   receiveWsMessage: (message: { id: string; sender: string; content: string; messageType: string; agentId: string }) => {
-    // Ignore user messages (already displayed)
     if (message.sender === 'user') return;
+    const selected = get().selectedAgent;
+    if (selected && message.agentId !== selected.id) return;
 
     const agentMsg: AgentConversation = {
       id: message.id,
@@ -305,7 +320,18 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
       content: message.content,
       type: 'report',
     };
-    set((state) => ({ conversations: [...state.conversations, agentMsg], isSending: false }));
+    // Replace streaming message with final message
+    const streamId = `stream-${message.id}`;
+    const doneSending = new Set(get().sendingAgents);
+    doneSending.delete(message.agentId);
+    set((state) => ({
+      conversations: [
+        ...state.conversations.filter((c) => c.id !== streamId),
+        agentMsg,
+      ],
+      isSending: doneSending.size > 0,
+      sendingAgents: doneSending,
+    }));
 
     // Browser notification
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
@@ -317,6 +343,36 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
         icon: '/next.svg',
         tag: `chat-${message.id}`,
       });
+    }
+  },
+
+  /**
+   * Called when WS chat:stream event arrives (real-time token streaming).
+   */
+  receiveWsStream: (data: { agentId: string; responseMsgId: string; content: string }) => {
+    const selected = get().selectedAgent;
+    if (selected && data.agentId !== selected.id) return;
+
+    const state = get();
+    const streamId = `stream-${data.responseMsgId}`;
+    const existing = state.conversations.find((c) => c.id === streamId);
+
+    if (existing) {
+      set({
+        conversations: state.conversations.map((c) =>
+          c.id === streamId ? { ...c, content: data.content } : c
+        ),
+      });
+    } else {
+      const streamMsg: AgentConversation = {
+        id: streamId,
+        timestamp: new Date().toISOString(),
+        fromAgent: '...',
+        toAgent: 'user',
+        content: data.content,
+        type: 'report',
+      };
+      set({ conversations: [...state.conversations, streamMsg] });
     }
   },
 

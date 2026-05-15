@@ -148,6 +148,30 @@ Response: {
 }
 ```
 
+### POST /api/agents/:id/chat
+> 에이전트와 비동기 CLI 채팅 (F057, F062)
+
+```
+Request:  { message: string }
+Response: { data: { ok: true } }
+```
+
+- cli-executor.ts가 WS 서버 프로세스 내에서 비동기적으로 CLI를 실행
+- 응답은 WebSocket `chat:stream` 이벤트로 실시간 스트리밍
+- 에이전트별 병렬 전송 지원 (`sendingAgents: Set<string>` in agentDetailStore)
+
+### POST /api/agents/:id/open-terminal
+> macOS Terminal.app에서 CLI 세션 열기 (F057, F058)
+
+```
+Response: { data: { ok: true, command: string } }
+Errors:   AGENT_NOT_FOUND, 500 (osascript 실행 실패)
+```
+
+- `osascript`로 macOS Terminal.app을 열고 `claude --resume <cliSessionId>` 실행
+- 에이전트의 `projectRoot` 디렉토리에서 실행
+- `cliSessionId`가 없으면 새 세션으로 시작
+
 ---
 
 ## 4. Parts API
@@ -608,7 +632,100 @@ Response: {
 
 ---
 
-## 17. Hooks API (내부용)
+## 17. Projects API (우선순위 관리)
+
+### GET /api/projects
+> 프로젝트 목록 조회 (F021)
+
+```
+Query:    ?partId=xxx&status=active&priority=urgent&sort=priority
+Response: {
+  data: [{
+    id, name, partId, partName,
+    status, currentStage, progressPercent,
+    priority: 'urgent' | 'high' | 'normal' | 'low',
+    subAgentId, startedAt, completedAt
+  }]
+}
+```
+
+### PUT /api/projects/:id/priority
+> 프로젝트 우선순위 변경 (F021)
+
+```
+Request:  { priority: 'urgent' | 'high' | 'normal' | 'low' }
+Response: { data: { id, priority, updated: true } }
+Errors:   PROJECT_NOT_FOUND
+```
+- Urgent 설정 시 해당 프로젝트 실행 큐에서 기존 작업 선점
+- 우선순위 변경 시 감사 로그 기록 + 알림 발송
+
+### PUT /api/projects/reorder
+> 프로젝트 순서 변경 (드래그 재정렬) (F021)
+
+```
+Request:  { projectIds: string[] }  // 새 순서
+Response: { data: { updated: true } }
+```
+
+---
+
+## 18. Execution Queue API (실행 큐)
+
+### GET /api/execution/status
+> 실행 큐 현황 조회
+
+```
+Response: {
+  data: {
+    running: number,
+    queued: number,
+    maxConcurrent: number,
+    queue: [{
+      id, projectId, projectName, agentId,
+      taskDescription, priority, status,
+      startedAt, createdAt
+    }]
+  }
+}
+```
+
+### POST /api/execution/:id/cancel
+> 큐 항목 취소
+
+```
+Response: { data: { id, status: 'cancelled' } }
+Errors:   EXECUTION_NOT_FOUND, EXECUTION_ALREADY_COMPLETED
+```
+
+---
+
+## 19. Checkpoints API (체크포인트)
+
+### GET /api/agents/:id/checkpoints
+> 에이전트 체크포인트 목록 (안정성)
+
+```
+Response: {
+  data: [{
+    id, agentId, projectId,
+    currentStage, completedTasks, pendingTasks,
+    createdAt
+  }]
+}
+```
+
+### POST /api/agents/:id/checkpoints/:checkpointId/restore
+> 체크포인트로 복원
+
+```
+Response: { data: { agentId, restoredFrom: checkpointId, status: 'restoring' } }
+Errors:   CHECKPOINT_NOT_FOUND, AGENT_BUSY
+```
+
+---
+
+## 20. Hooks API (내부용)
 
 ### POST /api/hooks/event
 > Claude Code Hooks 이벤트 수신 (F041)
@@ -645,6 +762,7 @@ ws://localhost:3001/ws?token=<JWT>
 | `agent:removed` | `{ agentId }` | F010, F011 |
 | `chat:message` | `{ id, sender, content, messageType, metadata? }` | F059 |
 | `chat:typing` | `{ isTyping: boolean }` | F059 |
+| `chat:stream` | `{ agentId, token, done }` | F057, F062 |
 | `approval:request` | `{ id, title, content, urgency, sourceAgent }` | F023 |
 | `approval:resolved` | `{ id, status, resolvedAt }` | F024 |
 | `project:progress` | `{ projectId, stage, percentage }` | F013, F014 |
@@ -653,6 +771,8 @@ ws://localhost:3001/ws?token=<JWT>
 | `cost:updated` | `{ totalCost, costLimit, percentage }` | F016, F031 |
 | `system:health` | `{ cpu, memory, disk, networkUp, networkDown }` | F017 |
 | `system:recovery` | `{ phase, progress, recoveredAgents[] }` | F042, F043 |
+| `project:priority` | `{ projectId, priority, previousPriority }` | F021 |
+| `execution:status` | `{ running, queued, maxConcurrent }` | 실행 큐 상태 |
 | `note:updated` | `{ agentId, file, content }` | F040, F041 |
 | `log:new` | `{ agentId, entry }` | F034, F062 |
 | `terminal:output` | `{ sessionId, data: string }` | F057 |
@@ -669,27 +789,30 @@ ws://localhost:3001/ws?token=<JWT>
 
 ---
 
-## 19. API 통계
+## 22. API 통계
 
 | 그룹 | REST 엔드포인트 | WebSocket 이벤트 | 관련 기능 |
 |---|---|---|---|
 | Auth | 3 | - | F059 |
-| Agents | 5 | 4 S->C | F012~F015, F040, F057, F062 |
+| Agents | 7 | 4 S->C | F012~F015, F040, F057, F062 |
 | Parts | 4 | 1 S->C | F009, F027, F035, F065 |
 | Skills | 3 | - | F001~F006 |
-| Chat | 2 | 3 (2 S->C, 1 C->S) | F059~F061 |
+| Chat | 2 | 4 (3 S->C, 1 C->S) | F059~F061 |
 | Approvals | 5 | 2 S->C | F023~F027 |
 | Cost | 4 | 1 S->C | F016, F031, F037, F046 |
 | Reports | 3 | - | F013, F025, F040, F062 |
 | Notifications | 2 | 1 S->C | F028~F031 |
 | Settings | 2 | - | F064, F065 |
 | API Keys | 4 | - | F036~F039 |
-| Backups | 3 | - | F068, F069 |
+| ~~Backups~~ | ~~3~~ 0 | - | ~~F068, F069~~ (Phase 3에서 삭제) |
 | System | 2 | 2 S->C | F017, F042, F043 |
 | Audit | 1 | - | F063 |
 | Error Logs | 1 | - | F034 |
 | Hooks | 1 | - | F041 |
+| Projects | 3 | 1 S->C | F021 |
+| Execution Queue | 2 | 1 S->C | 안정성 |
+| Checkpoints | 2 | - | 안정성 |
 | Notes | - | 1 S->C | F040 |
 | Logs | - | 1 S->C | F062 |
 | Terminal | - | 4 (1 S->C, 3 C->S) | F057, F058 |
-| **합계** | **45** | **20** | |
+| **합계** | **51** | **23** | |

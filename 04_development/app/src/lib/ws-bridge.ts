@@ -1,12 +1,10 @@
 /**
- * WebSocket Bridge — allows Next.js API routes to broadcast events to the
- * separate WebSocket server process.
+ * WebSocket Bridge — allows Next.js API routes to communicate with the
+ * WebSocket server running in the same process via internal HTTP endpoints.
  *
- * The WS server exposes an internal HTTP endpoint at /_broadcast on port 3001.
- * This module provides a simple fire-and-forget POST to that endpoint.
- *
- * If the WS server is unreachable (e.g. not started yet), errors are logged
- * but do not break the API route.
+ * Even though WS server runs in the same Node.js process (via instrumentation.ts),
+ * Next.js bundles API routes separately, so direct imports may reference
+ * different module instances. HTTP bridging via localhost is reliable and fast.
  */
 
 import { WS_PORT } from './constants';
@@ -17,8 +15,7 @@ const WS_CLI_CANCEL_URL = `http://localhost:${WS_PORT}/_cli-cancel`;
 const BROADCAST_SECRET = process.env.WS_BROADCAST_SECRET || 'claudemanager-ws-internal';
 
 /**
- * Request CLI execution on the WS server process.
- * Fire-and-forget — the WS server runs the CLI and delivers results via WebSocket.
+ * Request CLI execution on the WS server.
  */
 export async function requestCliExecution(params: {
   agentId: string;
@@ -40,9 +37,7 @@ export async function requestCliExecution(params: {
       signal: AbortSignal.timeout(5000),
     });
   } catch {
-    if (process.env.NODE_ENV === 'development') {
-      console.debug('[ws-bridge] Failed to request CLI execution — WS server may be offline');
-    }
+    console.debug('[ws-bridge] Failed to request CLI execution');
   }
 }
 
@@ -72,7 +67,6 @@ export async function requestCliCancel(agentId: string): Promise<boolean> {
 
 /**
  * Broadcast an event to all connected WebSocket clients.
- * Fire-and-forget — never throws.
  */
 export async function wsBroadcast(type: string, payload: unknown): Promise<void> {
   try {
@@ -86,115 +80,58 @@ export async function wsBroadcast(type: string, payload: unknown): Promise<void>
       signal: AbortSignal.timeout(3000),
     });
   } catch {
-    // WS server may not be running — silently ignore
     if (process.env.NODE_ENV === 'development') {
-      console.debug(`[ws-bridge] Failed to broadcast ${type} — WS server may be offline`);
+      console.debug(`[ws-bridge] Failed to broadcast ${type}`);
     }
   }
 }
 
-/**
- * Broadcast an agent status change.
- */
-export function broadcastAgentStatus(
-  agentId: string,
-  status: string,
-  statusMessage?: string
-): Promise<void> {
+export function broadcastAgentStatus(agentId: string, status: string, statusMessage?: string): Promise<void> {
   return wsBroadcast('agent:status', { agentId, status, statusMessage });
 }
 
-/**
- * Broadcast a new chat message.
- */
 export function broadcastChatMessage(message: {
-  id: string;
-  sender: string;
-  content: string;
-  messageType: string;
-  metadata?: unknown;
+  id: string; sender: string; content: string; messageType: string; metadata?: unknown;
 }): Promise<void> {
   return wsBroadcast('chat:message', message);
 }
 
-/**
- * Broadcast an approval request.
- */
 export function broadcastApprovalRequest(approval: {
-  id: string;
-  title: string;
-  content: string;
-  urgency: string;
-  sourceAgent?: string;
+  id: string; title: string; content: string; urgency: string; sourceAgent?: string;
 }): Promise<void> {
   return wsBroadcast('approval:request', approval);
 }
 
-/**
- * Broadcast an approval resolution.
- */
 export function broadcastApprovalResolved(id: string, result: string): Promise<void> {
   return wsBroadcast('approval:resolved', { id, result });
 }
 
-/**
- * Broadcast a new Part creation.
- */
-export function broadcastPartCreated(part: {
-  id: string;
-  name: string;
-  color?: string | null;
-}): Promise<void> {
+export function broadcastPartCreated(part: { id: string; name: string; color?: string | null }): Promise<void> {
   return wsBroadcast('part:created', { part });
 }
 
-/**
- * Broadcast a new agent creation.
- */
 export function broadcastAgentCreated(agent: {
-  id: string;
-  name: string;
-  role: string;
-  partId?: string | null;
+  id: string; name: string; role: string; partId?: string | null;
 }): Promise<void> {
   return wsBroadcast('agent:created', { agent });
 }
 
-/**
- * Broadcast an agent removal.
- */
 export function broadcastAgentRemoved(agentId: string): Promise<void> {
   return wsBroadcast('agent:removed', { agentId });
 }
 
-/**
- * Broadcast a notification.
- */
 export function broadcastNotification(notification: {
-  id?: number;
-  type: string;
-  title: string;
-  message: string;
+  id?: number; type: string; title: string; message: string;
 }): Promise<void> {
   return wsBroadcast('notification:new', { notification });
 }
 
-/**
- * Broadcast cost update.
- */
 export function broadcastCostUpdated(summary: {
-  totalCost: number;
-  overageLimit: number;
-  overage: number;
-  overageRemaining: number;
-  percentage: number;
+  totalCost: number; overageLimit: number; overage: number; overageRemaining: number; percentage: number;
 }): Promise<void> {
   return wsBroadcast('cost:updated', { summary });
 }
 
-/**
- * Broadcast a new log entry.
- */
 export function broadcastLogNew(agentId: string, entry: Record<string, unknown>): Promise<void> {
   return wsBroadcast('log:new', { agentId, entry });
 }

@@ -1,5 +1,5 @@
 # 코딩 규칙
-> 작성: developer | 상태: 작성 완료
+> 작성: developer | 상태: Phase 4 업데이트 완료
 
 ---
 
@@ -36,7 +36,7 @@
 - 함수형 컴포넌트만 사용 (`function` 선언 또는 화살표 함수)
 - `'use client'` 디렉티브: 클라이언트 컴포넌트에만 명시
 - 서버 컴포넌트 우선: 가능하면 서버 컴포넌트로 작성
-- `React.lazy` + `Suspense`: 3D, 터미널, 차트 번들 지연 로딩
+- `React.lazy` + `Suspense`: 터미널, 차트, 노트 뷰어 번들 지연 로딩
 
 ### 상태 관리 (Zustand)
 - Store별 단일 책임 원칙
@@ -93,11 +93,11 @@
 
 ## 9. 성능 규칙
 
-- 3D 번들: 데스크톱(1024px+)에서만 dynamic import
-- 모바일: 3D 번들 로딩 자체를 하지 않음
-- 이미지/모델: Draco 압축 `.glb` 사용
-- GPU 인스턴싱: 동일 모델 에이전트는 `InstancedMesh`
-- 코드 분할: 터미널(xterm.js), 차트 라이브러리 lazy load
+- 메인 번들: React, Zustand, Tailwind, shadcn/ui, 4-column dashboard, chat
+- 터미널 번들: xterm.js + addons (AgentModal CLI tab lazy load)
+- 차트 번들: 차트 라이브러리 (Resources 페이지 진입 시 lazy load)
+- 노트 뷰어 번들: 마크다운 렌더러 (note tab/page lazy load)
+- 코드 분할: `React.lazy` + `Suspense` 사용
 
 ## 10. 코드 품질
 
@@ -106,3 +106,84 @@
 - 콘솔 로그: 개발 환경에서만 허용 (`console.error`는 예외)
 - 주석: 복잡한 로직에만 Why 주석 작성
 - 커밋 메시지: Conventional Commits 형식
+
+## 11. Backend Engine Rules
+
+### Agent Manager (child_process.spawn)
+- 에이전트 실행: `child_process.spawn('claude', ['--print', '--output-format', 'stream-json', '-p', prompt])`
+- 에이전트 통신: stdout JSON 라인 파싱, 구조화된 이벤트 처리
+- node-pty: CLI 탭 (터미널 디버깅) 전용 -- 채팅/명령 통신에 사용하지 않음
+- 타임아웃: 기본 10분, 장시간 작업은 checkpoint로 분할
+
+### 에이전트 계층별 CLI 사용
+- **Main**: CLI 대화 O — PMO (부서/프로젝트 구성, 일정/리포트)
+- **Part**: CLI 대화 X — 스킬 그룹 (DB 레코드, 에이전트 아님)
+- **Sub**: CLI 대화 O — 프로젝트 관리+수행 (사용자와 직접 대화)
+- **Instance**: CLI 대화 X — Sub 내부 자동실행 (진행 상태, AI 모델 표시)
+- Part 생성 시 에이전트 레코드 생성 금지 (parts 테이블만 사용)
+
+### Orchestrator
+- `.orchestrator/` folder structure: `{partId}/sub-contexts/`, `decisions/`, `progress/`, `main-context.md`
+- Sub Skill 파일: `.orchestrator/{partId}/sub-contexts/{subId}.md`
+
+### Checkpoint System
+- 체크포인트 저장: 작업 단계 완료 시 자동 저장
+- 에이전트당 최대 3개 유지, 오래된 것 자동 삭제
+- 복구: 재시작 시 최신 체크포인트에서 컨텍스트 복원
+
+### Execution Queue
+- 4단계 우선순위: urgent > high > normal > low
+- 동시 실행 제한: settings 테이블의 max_concurrent_agents 값 사용
+- urgent 진입 시 low 작업 일시 중지 가능
+
+### Message Queue
+- 상태 흐름: created -> sent -> delivered -> processed
+- 미전달 메시지 30초 후 자동 재전송 (최대 3회)
+- processed/failed 상태 7일 후 자동 삭제
+
+### Skill System
+- Main Skill: `src/skills/main-agent.md` — Main 에이전트 시스템 프롬프트
+- Sub Skill: CLAUDE.md 형식, Main과 사용자가 대화로 작성 → Sub 생성 시 주입
+- Skill Loader: `src/lib/skill-loader.ts` — loadMainSkill(), parseActions()
+- 액션 포맷: `<<ACTION:TYPE>>{ json }<<END_ACTION>>` — 채팅 응답에서 파싱 후 서버사이드 실행
+- 지원 액션: CREATE_PART, CREATE_SUB
+
+### Skill Engine (bash, legacy)
+- Skills directory: `$CLAUDEMANAGER_HOME/skills/`
+- Entry modes: `bash skill.sh schema` (JSON output) and `bash skill.sh execute '{json}'`
+- SKILL_DIR env var for inheritance (`source "$SKILL_DIR/base-part.sh"`)
+- Default skills: `base-part.sh`, `project-part.sh`
+- Version lock: `skill-version.lock` per Part directory
+
+### WebSocket Bridge
+- WS server runs separately from Next.js on port 3001
+- API routes broadcast via `src/lib/ws-bridge.ts` (HTTP POST to `/_broadcast`)
+- Fire-and-forget: broadcast failures never break API routes
+- Internal auth: `x-ws-secret` header
+- All S-to-C events routed through `broadcast()` function
+
+### Terminal
+- node-pty preferred, child_process fallback when native build fails
+- One terminal session per agent (disconnect old before connecting new)
+- Terminal session IDs: `term-{agentId}-{timestamp}`
+- CLI tab only -- not for agent communication
+
+## 12. UI 컴포넌트 규칙
+
+### 공용 카드 컴포넌트
+- 카드 컴포넌트: `src/components/workspace/cards.tsx`에 모든 카드 정의
+- 디자인 상수: `CARD_HEIGHT(96)`, `CARD_RADIUS(14)`, `CARD_PADDING(14)`, `ICON_SIZE(36)`
+- CardShell: 모든 카드의 공통 래퍼 (높이, 패딩, 테두리, 그림자, 색상 바 통일)
+- 인라인 카드 정의 금지 — 반드시 cards.tsx에서 import하여 사용
+- 카드 종류: MainAgentCard(다크), PartCard, AgentCard(Sub/Instance), TaskCard
+
+### 컬럼 레이아웃
+- ColumnHeader: 고정 높이 36px (showAdd 버튼 유무와 무관)
+- ColumnEmpty: 빈 상태 안내 (HTML dangerouslySetInnerHTML 사용)
+
+### ApiClient HTTP 메서드
+- `apiClient.get()` — GET
+- `apiClient.post()` — POST
+- `apiClient.put()` — PUT
+- `apiClient.patch()` — PATCH
+- `apiClient.del()` — DELETE (delete는 JS 예약어이므로 `del` 사용)

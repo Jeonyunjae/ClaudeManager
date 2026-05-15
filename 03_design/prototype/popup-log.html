@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YJ Manager — 로그 탭</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg-page: #E8ECEF;
+    --bg-card: #FFFFFF;
+    --text-primary: #10141A;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+    --border-light: #E5E7EB;
+    --accent-purple: #7C5CFC;
+    --accent-blue: #3B82F6;
+    --accent-mint: #34D399;
+    --status-active: #3B82F6;
+    --status-idle: #9CA3AF;
+    --status-pending: #F59E0B;
+    --status-error: #EF4444;
+    --status-complete: #10B981;
+    --shadow-popup: 0 20px 60px rgba(0,0,0,0.15);
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-size: 13px; line-height: 1.5;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+  }
+  .popup-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .popup {
+    width: 640px; max-height: 85vh; background: var(--bg-card);
+    border-radius: 18px; box-shadow: var(--shadow-popup);
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .popup-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 20px 24px 16px; border-bottom: 1px solid var(--border-light);
+  }
+  .popup-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; color: white;
+  }
+  .popup-header-info { flex: 1; }
+  .popup-header-name { font-size: 15px; font-weight: 600; }
+  .popup-header-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+  .popup-status-badge { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 10px; }
+  .popup-close {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: none; background: transparent; color: var(--text-tertiary);
+    cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .popup-close:hover { background: #F3F4F6; }
+  .popup-tabs { display: flex; border-bottom: 1px solid var(--border-light); }
+  .popup-tab {
+    flex: 1; padding: 12px; text-align: center;
+    font-size: 12px; font-weight: 500; color: var(--text-tertiary);
+    border: none; background: transparent; cursor: pointer;
+    position: relative; transition: color 0.15s; text-decoration: none;
+  }
+  .popup-tab:hover { color: var(--text-secondary); }
+  .popup-tab.active { color: var(--accent-purple); }
+  .popup-tab.active::after {
+    content: ''; position: absolute; bottom: 0;
+    left: 25%; right: 25%; height: 2px;
+    background: var(--accent-purple); border-radius: 2px;
+  }
+  .popup-content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+  /* ── Log Tab ── */
+  .log-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .log-filter-group {
+    display: flex; gap: 4px;
+  }
+  .log-filter-btn {
+    padding: 4px 10px; border-radius: 6px; border: none;
+    font-size: 10px; font-weight: 500; cursor: pointer;
+    background: #F3F4F6; color: var(--text-secondary);
+    transition: all 0.15s;
+  }
+  .log-filter-btn:hover { background: #E5E7EB; }
+  .log-filter-btn.active { background: var(--accent-purple); color: white; }
+  .log-filter-btn .count {
+    font-size: 9px; margin-left: 3px;
+    opacity: 0.7;
+  }
+  .log-search {
+    padding: 5px 10px; border-radius: 6px;
+    border: 1px solid var(--border-light); font-size: 11px;
+    outline: none; width: 160px; font-family: inherit;
+  }
+  .log-search:focus { border-color: var(--accent-purple); }
+
+  /* Summary Cards */
+  .log-summary {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    margin-bottom: 16px;
+  }
+  .log-summary-card {
+    background: #F9FAFB; border-radius: 8px; padding: 10px 12px;
+    text-align: center;
+  }
+  .log-summary-value { font-size: 18px; font-weight: 700; }
+  .log-summary-label { font-size: 9px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+  /* Log Table */
+  .log-table { width: 100%; border-collapse: collapse; }
+  .log-table th {
+    text-align: left; font-size: 10px; font-weight: 600;
+    color: var(--text-tertiary); text-transform: uppercase;
+    letter-spacing: 0.04em; padding: 8px 10px;
+    border-bottom: 1px solid var(--border-light);
+    position: sticky; top: 0; background: var(--bg-card);
+  }
+  .log-table td {
+    padding: 8px 10px; font-size: 11px;
+    border-bottom: 1px solid #F9FAFB;
+    color: var(--text-primary);
+    vertical-align: middle;
+  }
+  .log-table tr:last-child td { border-bottom: none; }
+  .log-table tr:hover td { background: #FAFBFC; }
+
+  .log-event-badge {
+    font-size: 9px; font-weight: 500; padding: 2px 8px;
+    border-radius: 10px; display: inline-block; white-space: nowrap;
+  }
+  .log-event-badge.start { background: #DBEAFE; color: #1E40AF; }
+  .log-event-badge.complete { background: #D1FAE5; color: #065F46; }
+  .log-event-badge.error { background: #FEE2E2; color: #991B1B; }
+  .log-event-badge.approval { background: #FEF3C7; color: #92400E; }
+  .log-event-badge.report { background: #EDE9FE; color: #5B21B6; }
+  .log-event-badge.command { background: #F3F4F6; color: var(--text-secondary); }
+
+  .log-msg { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log-cost { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-secondary); }
+  .log-token { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-tertiary); }
+
+  /* Cost Chart */
+  .log-cost-section {
+    margin-top: 20px; padding-top: 16px;
+    border-top: 1px solid var(--border-light);
+  }
+  .log-cost-title {
+    font-size: 12px; font-weight: 600; margin-bottom: 12px;
+  }
+  .cost-chart {
+    display: flex; align-items: flex-end; gap: 4px;
+    height: 80px; padding: 0 4px;
+  }
+  .cost-bar-wrapper {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .cost-bar {
+    width: 100%; border-radius: 3px 3px 0 0;
+    background: linear-gradient(to top, var(--accent-purple), var(--accent-blue));
+    transition: height 0.3s ease;
+  }
+  .cost-bar-label { font-size: 8px; color: var(--text-tertiary); }
+  .cost-bar-value { font-size: 8px; color: var(--text-secondary); font-weight: 600; }
+
+  .log-cost-total {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 12px; padding: 8px 12px; background: #F9FAFB;
+    border-radius: 8px; font-size: 11px;
+  }
+  .log-cost-total-value { font-size: 16px; font-weight: 700; color: var(--accent-purple); }
+
+  .back-link {
+    display: block; text-align: center; margin-top: 20px;
+    font-size: 12px; color: var(--accent-purple); text-decoration: none;
+  }
+  .back-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="popup-overlay">
+  <div class="popup">
+    <!-- Header -->
+    <div class="popup-header">
+      <div class="popup-avatar" style="background:#10141A;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="popup-header-info">
+        <div class="popup-header-name">Main</div>
+        <div class="popup-header-meta">
+          <span class="popup-status-badge" style="background:#DBEAFE;color:#1E40AF;">Active</span>
+          <span style="font-size:11px;color:var(--text-tertiary);">Main · claude-opus-4</span>
+        </div>
+      </div>
+      <button class="popup-close">×</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="popup-tabs">
+      <a href="popup-info.html" class="popup-tab" style="text-decoration:none;">정보</a>
+      <a href="popup-cli.html" class="popup-tab" style="text-decoration:none;">CLI</a>
+      <a href="popup-chat.html" class="popup-tab" style="text-decoration:none;">대화</a>
+      <button class="popup-tab active">로그</button>
+      <a href="popup-note.html" class="popup-tab" style="text-decoration:none;">노트</a>
+    </div>
+
+    <!-- Content: Log -->
+    <div class="popup-content">
+      <!-- Toolbar -->
+      <div class="log-toolbar">
+        <div class="log-filter-group">
+          <button class="log-filter-btn active">전체<span class="count">24</span></button>
+          <button class="log-filter-btn">작업<span class="count">12</span></button>
+          <button class="log-filter-btn">보고<span class="count">5</span></button>
+          <button class="log-filter-btn">승인<span class="count">3</span></button>
+          <button class="log-filter-btn">오류<span class="count">2</span></button>
+          <button class="log-filter-btn">명령<span class="count">2</span></button>
+        </div>
+        <input class="log-search" placeholder="로그 검색..." />
+      </div>
+
+      <!-- Summary -->
+      <div class="log-summary">
+        <div class="log-summary-card">
+          <div class="log-summary-value" style="color:var(--accent-purple);">$12.40</div>
+          <div class="log-summary-label">총 비용</div>
+        </div>
+        <div class="log-summary-card">
+          <div class="log-summary-value" style="color:var(--accent-blue);">162K</div>
+          <div class="log-summary-label">총 토큰</div>
+        </div>
+        <div class="log-summary-card">
+          <div class="log-summary-value" style="color:var(--accent-mint);">6h 42m</div>
+          <div class="log-summary-label">가동 시간</div>
+        </div>
+        <div class="log-summary-card">
+          <div class="log-summary-value" style="color:var(--status-error);">2</div>
+          <div class="log-summary-label">오류 횟수</div>
+        </div>
+      </div>
+
+      <!-- Log Table -->
+      <table class="log-table">
+        <thead>
+          <tr>
+            <th>시간</th>
+            <th>이벤트</th>
+            <th>메시지</th>
+            <th>비용</th>
+            <th>토큰</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color:var(--text-tertiary);white-space:nowrap;">14:32</td>
+            <td><span class="log-event-badge start">작업 시작</span></td>
+            <td class="log-msg">Dev Part에 프론트엔드 UI 작업 지시</td>
+            <td class="log-cost">$0.12</td>
+            <td class="log-token">2,450</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-tertiary);white-space:nowrap;">14:28</td>
+            <td><span class="log-event-badge complete">완료</span></td>
+            <td class="log-msg">백엔드 API 라우트 구현 완료 보고 수신</td>
+            <td class="log-cost">$0.08</td>
+            <td class="log-token">1,820</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-tertiary);white-space:nowrap;">14:15</td>
+            <td><span class="log-event-badge approval">승인 요청</span></td>
+            <td class="log-msg">QA Part 통합 테스트 시나리오 승인 전달</td>
+            <td class="log-cost">—</td>
+            <td class="log-token">340</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-tertiary);white-space:nowrap;">14:13</td>
+            <td><span class="log-event-badge report">보고</span></td>
+            <td class="log-msg">프론트엔드 진행 상황 보고 (사용자 질문 응답)</td>
+            <td class="log-cost">$0.06</td>
+            <td class="log-token">1,200</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-tertiary);white-space:nowrap;">14:10</td>
+            <td><span class="log-event-badge report">보고</span></td>
+            <td class="log-msg">프로젝트 현황 자동 보고 (정기)</td>
+            <td class="log-cost">$0.12</td>
+            <td class="log-token">2,450</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-tertiary);white-space:nowrap;">14:02</td>
+            <td><span class="log-event-badge error">오류</span></td>
+            <td class="log-msg">테스터 E2E 실패 알림 수신 — 상위 보고</td>
+            <td class="log-cost">$0.04</td>
+            <td class="log-token">890</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-tertiary);white-space:nowrap;">13:45</td>
+            <td><span class="log-event-badge command">명령</span></td>
+            <td class="log-msg">Backend Part에 DB 마이그레이션 스크립트 작성 지시</td>
+            <td class="log-cost">$0.08</td>
+            <td class="log-token">1,600</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-tertiary);white-space:nowrap;">13:00</td>
+            <td><span class="log-event-badge start">작업 시작</span></td>
+            <td class="log-msg">QA Part 테스트 계획 수립 지시</td>
+            <td class="log-cost">$0.10</td>
+            <td class="log-token">2,100</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-tertiary);white-space:nowrap;">12:30</td>
+            <td><span class="log-event-badge complete">완료</span></td>
+            <td class="log-msg">Design Part 리서치 완료 보고 수신</td>
+            <td class="log-cost">$0.06</td>
+            <td class="log-token">1,400</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-tertiary);white-space:nowrap;">09:00</td>
+            <td><span class="log-event-badge start">작업 시작</span></td>
+            <td class="log-msg">세션 시작 — 전체 프로젝트 상태 점검</td>
+            <td class="log-cost">$0.18</td>
+            <td class="log-token">3,600</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Cost Chart -->
+      <div class="log-cost-section">
+        <div class="log-cost-title">시간별 비용 추이 (오늘)</div>
+        <div class="cost-chart">
+          <div class="cost-bar-wrapper">
+            <div class="cost-bar-value">$0.18</div>
+            <div class="cost-bar" style="height:36px;"></div>
+            <div class="cost-bar-label">09</div>
+          </div>
+          <div class="cost-bar-wrapper">
+            <div class="cost-bar-value">$0.42</div>
+            <div class="cost-bar" style="height:56px;"></div>
+            <div class="cost-bar-label">10</div>
+          </div>
+          <div class="cost-bar-wrapper">
+            <div class="cost-bar-value">$0.80</div>
+            <div class="cost-bar" style="height:70px;"></div>
+            <div class="cost-bar-label">11</div>
+          </div>
+          <div class="cost-bar-wrapper">
+            <div class="cost-bar-value">$0.56</div>
+            <div class="cost-bar" style="height:50px;"></div>
+            <div class="cost-bar-label">12</div>
+          </div>
+          <div class="cost-bar-wrapper">
+            <div class="cost-bar-value">$0.92</div>
+            <div class="cost-bar" style="height:80px;"></div>
+            <div class="cost-bar-label">13</div>
+          </div>
+          <div class="cost-bar-wrapper">
+            <div class="cost-bar-value">$0.50</div>
+            <div class="cost-bar" style="height:45px;"></div>
+            <div class="cost-bar-label">14</div>
+          </div>
+        </div>
+        <div class="log-cost-total">
+          <span>오늘 총 비용</span>
+          <span class="log-cost-total-value">$12.40</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<a class="back-link" href="dashboard-prototype.html">← 대시보드로 돌아가기</a>
+
+</body>
+</html>

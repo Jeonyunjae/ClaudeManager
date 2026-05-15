@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YJ Manager — 대화 탭</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg-page: #E8ECEF;
+    --bg-card: #FFFFFF;
+    --bg-dark-card: #10141A;
+    --text-primary: #10141A;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+    --border-light: #E5E7EB;
+    --accent-purple: #7C5CFC;
+    --accent-mint: #34D399;
+    --status-active: #3B82F6;
+    --status-pending: #F59E0B;
+    --status-error: #EF4444;
+    --shadow-popup: 0 20px 60px rgba(0,0,0,0.15);
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-size: 13px; line-height: 1.5;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+  }
+  .popup-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .popup {
+    width: 560px; height: 80vh; background: var(--bg-card);
+    border-radius: 18px; box-shadow: var(--shadow-popup);
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .popup-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 20px 24px 16px; border-bottom: 1px solid var(--border-light);
+  }
+  .popup-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; color: white;
+  }
+  .popup-header-info { flex: 1; }
+  .popup-header-name { font-size: 15px; font-weight: 600; }
+  .popup-header-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+  .popup-status-badge { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 10px; }
+  .popup-close {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: none; background: transparent; color: var(--text-tertiary);
+    cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .popup-close:hover { background: #F3F4F6; }
+  .popup-tabs { display: flex; border-bottom: 1px solid var(--border-light); }
+  .popup-tab {
+    flex: 1; padding: 12px; text-align: center;
+    font-size: 12px; font-weight: 500; color: var(--text-tertiary);
+    border: none; background: transparent; cursor: pointer;
+    position: relative; transition: color 0.15s; text-decoration: none;
+  }
+  .popup-tab:hover { color: var(--text-secondary); }
+  .popup-tab.active { color: var(--accent-purple); }
+  .popup-tab.active::after {
+    content: ''; position: absolute; bottom: 0;
+    left: 25%; right: 25%; height: 2px;
+    background: var(--accent-purple); border-radius: 2px;
+  }
+
+  /* ── Chat Content ── */
+  .chat-content {
+    flex: 1; overflow-y: auto; display: flex; flex-direction: column;
+  }
+  .chat-date-divider {
+    text-align: center; padding: 12px 0; position: relative;
+  }
+  .chat-date-divider span {
+    font-size: 10px; color: var(--text-tertiary);
+    background: var(--bg-card); padding: 0 12px; position: relative; z-index: 1;
+  }
+  .chat-date-divider::before {
+    content: ''; position: absolute; left: 24px; right: 24px;
+    top: 50%; height: 1px; background: var(--border-light);
+  }
+
+  .chat-messages {
+    flex: 1; overflow-y: auto; padding: 16px 24px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  .chat-msg {
+    max-width: 85%; display: flex; flex-direction: column;
+  }
+  .chat-msg.from-agent { align-self: flex-start; }
+  .chat-msg.from-user { align-self: flex-end; }
+  .chat-msg.from-system { align-self: center; }
+
+  .chat-msg-sender {
+    font-size: 10px; font-weight: 600; margin-bottom: 3px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .chat-msg.from-agent .chat-msg-sender { color: var(--text-secondary); }
+  .chat-msg.from-user .chat-msg-sender { color: var(--accent-purple); text-align: right; }
+
+  .chat-msg-sender-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+
+  .chat-msg-bubble {
+    padding: 10px 14px; font-size: 12px; line-height: 1.6;
+    border-radius: 14px;
+  }
+  .chat-msg.from-agent .chat-msg-bubble {
+    background: #F3F4F6; color: var(--text-primary);
+    border-bottom-left-radius: 4px;
+  }
+  .chat-msg.from-user .chat-msg-bubble {
+    background: var(--accent-purple); color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-msg.from-system .chat-msg-bubble {
+    background: #FEF3C7; color: #92400E;
+    border-radius: 8px; font-size: 11px;
+    padding: 8px 14px;
+  }
+
+  .chat-msg-time {
+    font-size: 9px; color: var(--text-tertiary); margin-top: 3px;
+  }
+  .chat-msg.from-user .chat-msg-time { text-align: right; color: rgba(124,92,252,0.5); }
+
+  /* Approval Card in Chat */
+  .chat-approval-card {
+    background: #FFFBEB; border: 1px solid #FDE68A;
+    border-radius: 10px; padding: 12px; margin-top: 6px;
+  }
+  .chat-approval-header {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+  }
+  .chat-approval-icon {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #FDE68A; display: flex; align-items: center; justify-content: center;
+  }
+  .chat-approval-title { font-size: 11px; font-weight: 600; color: #92400E; }
+  .chat-approval-text { font-size: 11px; color: #78350F; margin-bottom: 8px; line-height: 1.5; }
+  .chat-approval-meta {
+    font-size: 10px; color: #B45309; margin-bottom: 8px;
+    display: flex; gap: 12px;
+  }
+  .chat-approval-actions { display: flex; gap: 6px; }
+  .chat-approval-btn {
+    padding: 6px 14px; border-radius: 6px; border: none;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chat-approval-btn.approve { background: #10B981; color: white; }
+  .chat-approval-btn.approve:hover { background: #059669; }
+  .chat-approval-btn.reject { background: #EF4444; color: white; }
+  .chat-approval-btn.reject:hover { background: #DC2626; }
+  .chat-approval-btn.modify { background: #F3F4F6; color: var(--text-primary); }
+  .chat-approval-btn.modify:hover { background: #E5E7EB; }
+
+  /* Report Card */
+  .chat-report-card {
+    background: #F0FDF4; border: 1px solid #BBF7D0;
+    border-radius: 10px; padding: 12px; margin-top: 6px;
+  }
+  .chat-report-title { font-size: 11px; font-weight: 600; color: #166534; margin-bottom: 6px; }
+  .chat-report-row {
+    display: flex; justify-content: space-between; padding: 3px 0;
+    font-size: 11px; color: #15803D;
+  }
+  .chat-report-row span:last-child { font-weight: 600; }
+
+  /* Error Card */
+  .chat-error-card {
+    background: #FEF2F2; border: 1px solid #FECACA;
+    border-radius: 10px; padding: 12px; margin-top: 6px;
+  }
+  .chat-error-title { font-size: 11px; font-weight: 600; color: #991B1B; margin-bottom: 4px; }
+  .chat-error-text { font-size: 11px; color: #B91C1C; line-height: 1.5; }
+  .chat-error-action {
+    margin-top: 8px; padding: 5px 12px; border-radius: 6px;
+    border: none; background: #FEE2E2; color: #991B1B;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+  }
+
+  /* Chat Input */
+  .chat-input-area {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 24px; border-top: 1px solid var(--border-light);
+    background: var(--bg-card);
+  }
+  .chat-input-attach {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: none; background: transparent; color: var(--text-tertiary);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .chat-input-attach:hover { background: #F3F4F6; }
+  .chat-input {
+    flex: 1; padding: 10px 14px; border-radius: 10px;
+    border: 1px solid var(--border-light); font-size: 12px;
+    outline: none; font-family: inherit;
+  }
+  .chat-input:focus { border-color: var(--accent-purple); box-shadow: 0 0 0 3px rgba(124,92,252,0.1); }
+  .chat-send-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--accent-purple); color: white; border: none;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .chat-send-btn:hover { background: #6D4FE0; }
+
+  .back-link {
+    display: block; text-align: center; margin-top: 20px;
+    font-size: 12px; color: var(--accent-purple); text-decoration: none;
+  }
+  .back-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="popup-overlay">
+  <div class="popup">
+    <!-- Header -->
+    <div class="popup-header">
+      <div class="popup-avatar" style="background:#10141A;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="popup-header-info">
+        <div class="popup-header-name">Main</div>
+        <div class="popup-header-meta">
+          <span class="popup-status-badge" style="background:#DBEAFE;color:#1E40AF;">Active</span>
+          <span style="font-size:11px;color:var(--text-tertiary);">Main · claude-opus-4</span>
+        </div>
+      </div>
+      <button class="popup-close">×</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="popup-tabs">
+      <a href="popup-info.html" class="popup-tab" style="text-decoration:none;">정보</a>
+      <a href="popup-cli.html" class="popup-tab" style="text-decoration:none;">CLI</a>
+      <button class="popup-tab active">대화</button>
+      <a href="popup-log.html" class="popup-tab" style="text-decoration:none;">로그</a>
+      <a href="popup-note.html" class="popup-tab" style="text-decoration:none;">노트</a>
+    </div>
+
+    <!-- Content: Chat -->
+    <div class="chat-content">
+      <div class="chat-messages">
+        <!-- Date Divider -->
+        <div class="chat-date-divider"><span>2026년 4월 16일 (수)</span></div>
+
+        <!-- System Message -->
+        <div class="chat-msg from-system">
+          <div class="chat-msg-bubble">
+            Main 에이전트가 시작되었습니다. 세션: cm-main-001
+          </div>
+        </div>
+
+        <!-- Agent Message: Report -->
+        <div class="chat-msg from-agent">
+          <div class="chat-msg-sender">
+            <span class="chat-msg-sender-dot" style="background:var(--accent-purple);"></span>
+            Main
+          </div>
+          <div class="chat-msg-bubble">
+            안녕하세요, 대표님. 오늘의 프로젝트 현황을 보고드립니다.
+            <div class="chat-report-card">
+              <div class="chat-report-title">프로젝트 현황 보고</div>
+              <div class="chat-report-row"><span>Dev Part</span><span>60% (Active)</span></div>
+              <div class="chat-report-row"><span>Design Part</span><span>완료 (Idle)</span></div>
+              <div class="chat-report-row"><span>QA Part</span><span>승인 대기 (Pending)</span></div>
+              <div class="chat-report-row"><span>총 비용</span><span>$12.40 / $100.00</span></div>
+            </div>
+          </div>
+          <div class="chat-msg-time">14:10</div>
+        </div>
+
+        <!-- User Message -->
+        <div class="chat-msg from-user">
+          <div class="chat-msg-sender">나</div>
+          <div class="chat-msg-bubble">프론트엔드 진행 상황은?</div>
+          <div class="chat-msg-time">14:12</div>
+        </div>
+
+        <!-- Agent Response -->
+        <div class="chat-msg from-agent">
+          <div class="chat-msg-sender">
+            <span class="chat-msg-sender-dot" style="background:var(--accent-purple);"></span>
+            Main
+          </div>
+          <div class="chat-msg-bubble">
+            프론트엔드팀은 현재 대시보드 카드 레이아웃을 작업 중입니다.<br><br>
+            UI 작업자가 SugarCRM 스타일로 4컬럼 플로우를 구현하고 있으며, 예상 완료 시간은 오늘 17:00입니다.
+          </div>
+          <div class="chat-msg-time">14:13</div>
+        </div>
+
+        <!-- Approval Request -->
+        <div class="chat-msg from-agent">
+          <div class="chat-msg-sender">
+            <span class="chat-msg-sender-dot" style="background:var(--accent-purple);"></span>
+            Main
+          </div>
+          <div class="chat-msg-bubble">
+            QA Part에서 승인 요청이 올라왔습니다.
+            <div class="chat-approval-card">
+              <div class="chat-approval-header">
+                <div class="chat-approval-icon">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#92400E" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                </div>
+                <span class="chat-approval-title">승인 요청 — QA Part</span>
+              </div>
+              <div class="chat-approval-text">통합 테스트 시나리오 30건에 대한 실행 승인을 요청합니다.</div>
+              <div class="chat-approval-meta">
+                <span>예상 비용: $2.40</span>
+                <span>예상 시간: 45분</span>
+              </div>
+              <div class="chat-approval-actions">
+                <button class="chat-approval-btn approve">승인</button>
+                <button class="chat-approval-btn reject">반려</button>
+                <button class="chat-approval-btn modify">수정 지시</button>
+              </div>
+            </div>
+          </div>
+          <div class="chat-msg-time">14:15</div>
+        </div>
+
+        <!-- Error Notification -->
+        <div class="chat-msg from-agent">
+          <div class="chat-msg-sender">
+            <span class="chat-msg-sender-dot" style="background:var(--status-error);"></span>
+            Main <span style="color:var(--status-error);font-size:9px;">via 테스터</span>
+          </div>
+          <div class="chat-msg-bubble">
+            테스터 에이전트에서 오류가 발생했습니다.
+            <div class="chat-error-card">
+              <div class="chat-error-title">E2E 테스트 실패 — timeout</div>
+              <div class="chat-error-text">
+                /workspace 페이지 로드 시 30초 타임아웃 초과.<br>
+                원인: dev 서버 미시작 또는 포트 충돌 가능성.
+              </div>
+              <button class="chat-error-action">테스터 재시작</button>
+            </div>
+          </div>
+          <div class="chat-msg-time">14:20</div>
+        </div>
+
+        <!-- User Response -->
+        <div class="chat-msg from-user">
+          <div class="chat-msg-sender">나</div>
+          <div class="chat-msg-bubble">테스터 재시작해줘. 포트 3000 정리하고 다시 시작해.</div>
+          <div class="chat-msg-time">14:22</div>
+        </div>
+
+        <!-- Agent Acknowledgment -->
+        <div class="chat-msg from-agent">
+          <div class="chat-msg-sender">
+            <span class="chat-msg-sender-dot" style="background:var(--accent-purple);"></span>
+            Main
+          </div>
+          <div class="chat-msg-bubble">
+            알겠습니다. 포트 3000을 정리하고 테스터 에이전트를 재시작하겠습니다.
+          </div>
+          <div class="chat-msg-time">14:22</div>
+        </div>
+      </div>
+
+      <!-- Input Area -->
+      <div class="chat-input-area">
+        <button class="chat-input-attach" title="파일 첨부">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <input class="chat-input" placeholder="Main에게 지시하기..." />
+        <button class="chat-send-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<a class="back-link" href="dashboard-prototype.html">← 대시보드로 돌아가기</a>
+
+</body>
+</html>

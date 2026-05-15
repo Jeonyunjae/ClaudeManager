@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YJ Manager — Setup</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg-dark: #10141A;
+    --bg-card: #FFFFFF;
+    --text-primary: #10141A;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+    --border-light: #E5E7EB;
+    --accent-purple: #7C5CFC;
+    --accent-purple-hover: #6D4FE0;
+    --accent-mint: #34D399;
+    --status-error: #EF4444;
+    --shadow-lg: 0 20px 60px rgba(0,0,0,0.12);
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  .bg-pattern {
+    position: fixed; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse at 30% 40%, rgba(124,92,252,0.15) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 60%, rgba(52,211,153,0.1) 0%, transparent 50%);
+  }
+  .bg-grid {
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .setup-card {
+    position: relative; z-index: 1;
+    width: 420px; background: var(--bg-card);
+    border-radius: 24px; box-shadow: var(--shadow-lg);
+    padding: 48px 40px;
+  }
+
+  .setup-header { text-align: center; margin-bottom: 32px; }
+  .setup-icon {
+    width: 64px; height: 64px; border-radius: 18px;
+    background: var(--bg-dark);
+    color: white; display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px; box-shadow: 0 8px 20px rgba(16,20,26,0.25);
+  }
+  .setup-title {
+    font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
+  }
+  .setup-desc {
+    font-size: 13px; color: var(--text-tertiary); margin-top: 6px; line-height: 1.5;
+  }
+
+  .setup-steps {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-bottom: 28px;
+  }
+  .setup-step {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 500;
+  }
+  .setup-step-dot {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+  }
+  .setup-step.done .setup-step-dot { background: var(--accent-mint); color: white; }
+  .setup-step.active .setup-step-dot { background: var(--accent-purple); color: white; }
+  .setup-step.pending .setup-step-dot { background: #F3F4F6; color: var(--text-tertiary); }
+  .setup-step.done { color: var(--accent-mint); }
+  .setup-step.active { color: var(--text-primary); }
+  .setup-step.pending { color: var(--text-tertiary); }
+  .setup-step-line {
+    width: 32px; height: 2px; background: var(--border-light); border-radius: 1px;
+  }
+  .setup-step-line.done { background: var(--accent-mint); }
+
+  .setup-form {
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .input-group { text-align: left; }
+  .input-label {
+    font-size: 12px; font-weight: 500; color: var(--text-secondary);
+    margin-bottom: 6px; display: block;
+  }
+  .input-wrapper { position: relative; }
+  .input-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--text-tertiary);
+  }
+  .input-field {
+    width: 100%; padding: 12px 14px 12px 42px;
+    border: 1.5px solid var(--border-light); border-radius: 12px;
+    font-size: 14px; font-family: inherit; outline: none;
+    transition: all 0.15s; background: #FAFBFC;
+  }
+  .input-field:focus {
+    border-color: var(--accent-purple);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.1);
+    background: white;
+  }
+  .input-match {
+    border-color: var(--accent-mint);
+    box-shadow: 0 0 0 3px rgba(52,211,153,0.1);
+  }
+
+  /* Password Strength */
+  .pw-strength { margin-top: 8px; }
+  .pw-strength-bar {
+    height: 4px; background: #F3F4F6; border-radius: 2px;
+    overflow: hidden; display: flex; gap: 3px;
+  }
+  .pw-strength-segment {
+    flex: 1; height: 100%; border-radius: 2px;
+    transition: background 0.3s;
+  }
+  .pw-strength-segment.filled-1 { background: var(--status-error); }
+  .pw-strength-segment.filled-2 { background: #F59E0B; }
+  .pw-strength-segment.filled-3 { background: #F59E0B; }
+  .pw-strength-segment.filled-4 { background: var(--accent-mint); }
+  .pw-strength-label {
+    display: flex; justify-content: space-between; margin-top: 4px;
+    font-size: 10px;
+  }
+  .pw-strength-text { color: var(--accent-mint); font-weight: 500; }
+  .pw-strength-hint { color: var(--text-tertiary); }
+
+  /* Match indicator */
+  .pw-match {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 11px; margin-top: 4px;
+  }
+  .pw-match.ok { color: var(--accent-mint); }
+  .pw-match.no { color: var(--status-error); }
+
+  .setup-btn {
+    width: 100%; padding: 13px;
+    background: var(--accent-purple); color: white;
+    border: none; border-radius: 12px;
+    font-size: 14px; font-weight: 600; font-family: inherit;
+    cursor: pointer; transition: all 0.15s;
+    margin-top: 8px;
+    box-shadow: 0 4px 12px rgba(124,92,252,0.25);
+  }
+  .setup-btn:hover {
+    background: var(--accent-purple-hover);
+    transform: translateY(-1px);
+  }
+
+  .setup-footer {
+    text-align: center; margin-top: 20px;
+    font-size: 11px; color: var(--text-tertiary); line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-pattern"></div>
+<div class="bg-grid"></div>
+
+<div class="setup-card">
+  <div class="setup-header">
+    <div class="setup-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div class="setup-title">초기 설정</div>
+    <div class="setup-desc">YJ Manager에 오신 것을 환영합니다.<br>관리자 비밀번호를 설정해주세요.</div>
+  </div>
+
+  <!-- Steps -->
+  <div class="setup-steps">
+    <div class="setup-step done">
+      <div class="setup-step-dot">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      서버 확인
+    </div>
+    <div class="setup-step-line done"></div>
+    <div class="setup-step active">
+      <div class="setup-step-dot">2</div>
+      비밀번호
+    </div>
+    <div class="setup-step-line"></div>
+    <div class="setup-step pending">
+      <div class="setup-step-dot">3</div>
+      완료
+    </div>
+  </div>
+
+  <div class="setup-form">
+    <div class="input-group">
+      <label class="input-label">비밀번호</label>
+      <div class="input-wrapper">
+        <span class="input-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </span>
+        <input class="input-field" type="password" placeholder="8자 이상 입력" value="••••••••••" />
+      </div>
+      <!-- Strength Bar -->
+      <div class="pw-strength">
+        <div class="pw-strength-bar">
+          <div class="pw-strength-segment filled-4"></div>
+          <div class="pw-strength-segment filled-4"></div>
+          <div class="pw-strength-segment filled-4"></div>
+          <div class="pw-strength-segment filled-4"></div>
+        </div>
+        <div class="pw-strength-label">
+          <span class="pw-strength-text">강함</span>
+          <span class="pw-strength-hint">영문+숫자+특수문자 포함</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">비밀번호 확인</label>
+      <div class="input-wrapper">
+        <span class="input-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </span>
+        <input class="input-field input-match" type="password" placeholder="비밀번호 재입력" value="••••••••••" />
+      </div>
+      <div class="pw-match ok">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        비밀번호가 일치합니다
+      </div>
+    </div>
+
+    <button class="setup-btn">설정 완료</button>
+  </div>
+
+  <div class="setup-footer">
+    이 비밀번호는 서버에 안전하게 해시되어 저장됩니다.<br>
+    분실 시 서버 CLI에서 재설정할 수 있습니다.
+  </div>
+</div>
+
+</body>
+</html>

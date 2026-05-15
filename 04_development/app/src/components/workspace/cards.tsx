@@ -83,12 +83,14 @@ function CardShell({
   selected,
   accentColor,
   onClick,
+  onDoubleClick,
   children,
 }: {
   dark?: boolean;
   selected?: boolean;
   accentColor: string;
   onClick?: () => void;
+  onDoubleClick?: () => void;
   children: React.ReactNode;
 }) {
   const style: React.CSSProperties = {
@@ -112,7 +114,7 @@ function CardShell({
   }
 
   return (
-    <div style={style} onClick={onClick}>
+    <div style={style} onClick={onClick} onDoubleClick={onDoubleClick}>
       {children}
       <div style={{ height: 3, borderRadius: 2, background: accentColor }} />
     </div>
@@ -207,17 +209,29 @@ function CardHeader({
 /** Main agent card (dark theme) */
 export function MainAgentCard({
   status,
+  statusMessage,
   model,
   pendingCount,
   onClick,
+  onDoubleClick,
 }: {
   status: string;
+  statusMessage?: string;
   model?: string;
   pendingCount?: number;
   onClick?: () => void;
+  onDoubleClick?: () => void;
 }) {
+  const subtitle = status === 'active'
+    ? statusMessage || 'Working...'
+    : status === 'error'
+    ? statusMessage || 'Error'
+    : statusMessage === 'Completed'
+    ? 'Completed'
+    : 'Project Orchestrator';
+
   return (
-    <CardShell dark accentColor="var(--accent-purple, #7C5CFC)" onClick={onClick}>
+    <CardShell dark accentColor="var(--accent-purple, #7C5CFC)" onClick={onClick} onDoubleClick={onDoubleClick}>
       <div>
         <CardHeader
           dark
@@ -231,7 +245,7 @@ export function MainAgentCard({
             </CardIcon>
           }
           title="Main"
-          subtitle="Project Orchestrator"
+          subtitle={subtitle}
           status={status}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: FONT.meta, color: '#9CA3AF' }}>
@@ -255,6 +269,7 @@ export function PartCard({
   pendingCount,
   isSelected,
   onClick,
+  onDoubleClick,
 }: {
   name: string;
   description?: string;
@@ -266,9 +281,10 @@ export function PartCard({
   pendingCount: number;
   isSelected?: boolean;
   onClick?: () => void;
+  onDoubleClick?: () => void;
 }) {
   return (
-    <CardShell accentColor={color} selected={isSelected} onClick={onClick}>
+    <CardShell accentColor={color} selected={isSelected} onClick={onClick} onDoubleClick={onDoubleClick}>
       <div>
         <CardHeader
           icon={<CardIcon color={color} label={name.slice(0, 3)} />}
@@ -299,6 +315,7 @@ export function AgentCard({
   pendingCount,
   completeCount,
   onClick,
+  onDoubleClick,
 }: {
   name: string;
   subtitle: string;
@@ -311,9 +328,10 @@ export function AgentCard({
   pendingCount?: number;
   completeCount?: number;
   onClick?: () => void;
+  onDoubleClick?: () => void;
 }) {
   return (
-    <CardShell accentColor={color} selected={isSelected} onClick={onClick}>
+    <CardShell accentColor={color} selected={isSelected} onClick={onClick} onDoubleClick={onDoubleClick}>
       <div>
         <CardHeader
           icon={<CardIcon color={color} label={name.slice(0, 3)} round={isInstance} />}

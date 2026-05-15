@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YJ Manager — 정보 탭</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg-page: #E8ECEF;
+    --bg-card: #FFFFFF;
+    --bg-dark-card: #10141A;
+    --text-primary: #10141A;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+    --text-white: #FFFFFF;
+    --border-light: #E5E7EB;
+    --accent-blue: #3B82F6;
+    --accent-purple: #7C5CFC;
+    --accent-coral: #E8606D;
+    --accent-mint: #34D399;
+    --accent-amber: #F59E0B;
+    --status-active: #3B82F6;
+    --status-idle: #9CA3AF;
+    --status-pending: #F59E0B;
+    --status-error: #EF4444;
+    --status-complete: #10B981;
+    --shadow-popup: 0 20px 60px rgba(0,0,0,0.15);
+    --radius-card: 14px;
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1.5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .popup-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .popup {
+    width: 560px; max-height: 85vh; background: var(--bg-card);
+    border-radius: 18px; box-shadow: var(--shadow-popup);
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .popup-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 20px 24px 16px; border-bottom: 1px solid var(--border-light);
+  }
+  .popup-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; color: white;
+  }
+  .popup-header-info { flex: 1; }
+  .popup-header-name { font-size: 15px; font-weight: 600; }
+  .popup-header-meta {
+    display: flex; align-items: center; gap: 8px; margin-top: 3px;
+  }
+  .popup-status-badge {
+    font-size: 10px; font-weight: 500; padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .popup-close {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: none; background: transparent; color: var(--text-tertiary);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .popup-close:hover { background: #F3F4F6; }
+  .popup-tabs {
+    display: flex; border-bottom: 1px solid var(--border-light);
+  }
+  .popup-tab {
+    flex: 1; padding: 12px; text-align: center;
+    font-size: 12px; font-weight: 500; color: var(--text-tertiary);
+    border: none; background: transparent; cursor: pointer;
+    position: relative; transition: color 0.15s;
+  }
+  .popup-tab:hover { color: var(--text-secondary); }
+  .popup-tab.active { color: var(--accent-purple); }
+  .popup-tab.active::after {
+    content: ''; position: absolute; bottom: 0;
+    left: 25%; right: 25%; height: 2px;
+    background: var(--accent-purple); border-radius: 2px;
+  }
+  .popup-content {
+    flex: 1; overflow-y: auto; padding: 20px 24px;
+  }
+
+  /* ── Info Tab ── */
+  .info-section-title {
+    font-size: 11px; font-weight: 600; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin-bottom: 8px; margin-top: 16px;
+  }
+  .info-section-title:first-child { margin-top: 0; }
+
+  .info-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid #F9FAFB;
+    font-size: 12px;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-label { color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+  .info-label svg { width: 14px; height: 14px; stroke: var(--text-tertiary); fill: none; stroke-width: 2; }
+  .info-value { font-weight: 500; }
+
+  .info-progress-section {
+    margin-top: 16px; padding: 14px; background: #F9FAFB;
+    border-radius: 10px;
+  }
+  .info-progress-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .info-progress-title { font-size: 12px; font-weight: 600; }
+  .info-progress-pct { font-size: 18px; font-weight: 700; color: var(--accent-purple); }
+  .info-progress-bar {
+    height: 6px; background: #E5E7EB; border-radius: 3px; overflow: hidden;
+  }
+  .info-progress-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue));
+    transition: width 0.5s ease;
+  }
+  .info-progress-detail {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--text-tertiary); margin-top: 6px;
+  }
+
+  .info-children {
+    margin-top: 16px;
+  }
+  .info-child-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid #F9FAFB;
+  }
+  .info-child-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 10px; color: white;
+  }
+  .info-child-name { font-size: 12px; font-weight: 500; flex: 1; }
+  .info-child-status {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 500;
+  }
+
+  .info-actions {
+    display: flex; gap: 8px; margin-top: 20px; padding-top: 16px;
+    border-top: 1px solid var(--border-light);
+  }
+  .info-action-btn {
+    padding: 8px 16px; border-radius: 8px; border: none;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 0.15s;
+  }
+  .info-action-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .info-action-btn.restart { background: #DBEAFE; color: #1E40AF; }
+  .info-action-btn.restart:hover { background: #BFDBFE; }
+  .info-action-btn.stop { background: #FEE2E2; color: #991B1B; }
+  .info-action-btn.stop:hover { background: #FECACA; }
+  .info-action-btn.delete { background: #F3F4F6; color: var(--text-secondary); }
+  .info-action-btn.delete:hover { background: #E5E7EB; }
+
+  .back-link {
+    display: block; text-align: center; margin-top: 20px;
+    font-size: 12px; color: var(--accent-purple);
+    text-decoration: none;
+  }
+  .back-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="popup-overlay">
+  <div class="popup">
+    <!-- Header -->
+    <div class="popup-header">
+      <div class="popup-avatar" style="background:#10141A;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="popup-header-info">
+        <div class="popup-header-name">Main</div>
+        <div class="popup-header-meta">
+          <span class="popup-status-badge" style="background:#DBEAFE;color:#1E40AF;">Active</span>
+          <span style="font-size:11px;color:var(--text-tertiary);">Main · claude-opus-4</span>
+        </div>
+      </div>
+      <button class="popup-close">×</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="popup-tabs">
+      <button class="popup-tab active">정보</button>
+      <a href="popup-cli.html" class="popup-tab" style="text-decoration:none;">CLI</a>
+      <a href="popup-chat.html" class="popup-tab" style="text-decoration:none;">대화</a>
+      <a href="popup-log.html" class="popup-tab" style="text-decoration:none;">로그</a>
+      <a href="popup-note.html" class="popup-tab" style="text-decoration:none;">노트</a>
+    </div>
+
+    <!-- Content: 정보 -->
+    <div class="popup-content">
+      <div class="info-section-title">기본 정보</div>
+      <div class="info-row">
+        <span class="info-label">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+          역할
+        </span>
+        <span class="info-value">Main 오케스트레이터</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          가동 시간
+        </span>
+        <span class="info-value">6h 42m</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">
+          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="10" x2="20" y2="10"/></svg>
+          TMUX 세션
+        </span>
+        <span class="info-value" style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#F3F4F6;padding:2px 8px;border-radius:4px;">cm-main-001</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>
+          모델
+        </span>
+        <span class="info-value">claude-opus-4</span>
+      </div>
+
+      <div class="info-section-title">비용 및 사용량</div>
+      <div class="info-row">
+        <span class="info-label">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          총 비용
+        </span>
+        <span class="info-value">$12.40</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          입력 토큰
+        </span>
+        <span class="info-value">124,500</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          출력 토큰
+        </span>
+        <span class="info-value">38,200</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          승인 대기
+        </span>
+        <span class="info-value" style="color:var(--status-pending);font-weight:600;">1건</span>
+      </div>
+
+      <!-- Progress -->
+      <div class="info-progress-section">
+        <div class="info-progress-header">
+          <span class="info-progress-title">전체 진척율</span>
+          <span class="info-progress-pct">72%</span>
+        </div>
+        <div class="info-progress-bar">
+          <div class="info-progress-fill" style="width:72%;"></div>
+        </div>
+        <div class="info-progress-detail">
+          <span>시작: 2026-04-10 09:00</span>
+          <span>예상 완료: 2026-04-20</span>
+        </div>
+      </div>
+
+      <!-- Children -->
+      <div class="info-children">
+        <div class="info-section-title">하위 에이전트 (8명)</div>
+        <div class="info-child-item">
+          <div class="info-child-avatar" style="background:#6366F1;">개</div>
+          <span class="info-child-name">Dev Part</span>
+          <span class="info-child-status" style="background:#DBEAFE;color:#1E40AF;">Active · 5명</span>
+        </div>
+        <div class="info-child-item">
+          <div class="info-child-avatar" style="background:var(--accent-amber);">기</div>
+          <span class="info-child-name">Design Part</span>
+          <span class="info-child-status" style="background:#F3F4F6;color:var(--text-secondary);">Idle · 2명</span>
+        </div>
+        <div class="info-child-item">
+          <div class="info-child-avatar" style="background:var(--accent-mint);">Q</div>
+          <span class="info-child-name">QA Part</span>
+          <span class="info-child-status" style="background:#FEF3C7;color:#92400E;">Pending · 2명</span>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="info-actions">
+        <button class="info-action-btn restart">
+          <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          재시작
+        </button>
+        <button class="info-action-btn stop">
+          <svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          정지
+        </button>
+        <button class="info-action-btn delete">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          삭제
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<a class="back-link" href="dashboard-prototype.html">← 대시보드로 돌아가기</a>
+
+</body>
+</html>

@@ -15,6 +15,12 @@ import type { IncomingMessage } from 'http';
 import { verifyToken } from '../lib/auth';
 import { WS_PORT } from '../lib/constants';
 
+function ts() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 const BROADCAST_SECRET = process.env.WS_BROADCAST_SECRET || 'claudemanager-ws-internal';
 
 // ---------------------------------------------------------------------------
@@ -43,6 +49,7 @@ export const SERVER_EVENTS = [
   'agent:removed',
   'chat:message',
   'chat:typing',
+  'chat:stream',
   'approval:request',
   'approval:resolved',
   'project:progress',
@@ -178,10 +185,10 @@ export function createWSServer(port: number = WS_PORT): WebSocketServer {
           // Fire-and-forget: import and run cli-executor
           if (cliExecuteHandler) {
             cliExecuteHandler(params).catch((err: unknown) => {
-              console.error('[WS] CLI execution error:', err);
+              console.error(`[${ts()}] [WS] CLI execution error:`, err);
             });
           } else {
-            console.error('[WS] CLI execute handler not registered');
+            console.error(`[${ts()}] [WS] CLI execute handler not registered`);
           }
         } catch {
           res.writeHead(400);
@@ -245,7 +252,7 @@ export function createWSServer(port: number = WS_PORT): WebSocketServer {
     ws.isAlive = true;
     clients.add(ws);
 
-    console.log(`[WS] Client connected (userId: ${userId}). Total: ${clients.size}`);
+    console.log(`[${ts()}] [WS] Client connected (userId: ${userId}). Total: ${clients.size}`);
 
     ws.on('message', (raw) => {
       try {
@@ -269,7 +276,7 @@ export function createWSServer(port: number = WS_PORT): WebSocketServer {
 
     ws.on('close', () => {
       clients.delete(ws);
-      console.log(`[WS] Client disconnected. Total: ${clients.size}`);
+      console.log(`[${ts()}] [WS] Client disconnected. Total: ${clients.size}`);
     });
 
     ws.on('error', (err) => {

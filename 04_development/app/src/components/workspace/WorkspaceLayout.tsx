@@ -73,6 +73,26 @@ function getInstancesForSub(tree: AgentTreeNode[], subId: string): AgentTreeNode
   return result;
 }
 
+function getAllInstances(tree: AgentTreeNode[]): AgentTreeNode[] {
+  const result: AgentTreeNode[] = [];
+  function walk(node: AgentTreeNode) {
+    if (node.role === 'instance') result.push(node);
+    node.children.forEach(walk);
+  }
+  tree.forEach(walk);
+  return result;
+}
+
+function getInstancesForPart(tree: AgentTreeNode[], partId: string): AgentTreeNode[] {
+  const result: AgentTreeNode[] = [];
+  function walk(node: AgentTreeNode) {
+    if (node.partId === partId && node.role === 'instance') result.push(node);
+    node.children.forEach(walk);
+  }
+  tree.forEach(walk);
+  return result;
+}
+
 function countStatusInTree(nodes: AgentTreeNode[], status: string): number {
   let count = 0;
   function walk(node: AgentTreeNode) {
@@ -164,22 +184,38 @@ function LogEventBadge({ type }: { type: string }) {
    WorkspaceLayout — Prototype-matched 4-column
    ════════════════════════════════════════════════ */
 export function WorkspaceLayout() {
-  const { tree, fetchTree, initMain } = useAgentStore();
+  const { tree } = useAgentStore();
   const { pendingList } = useApprovalStore();
   const { parts: partList } = usePartStore();
   const { notifications } = useNotificationStore();
   const { openAgent } = useAgentDetailStore();
   const { setSelectedAgentId } = useWorkspaceStore();
-
-  // Auto-register Main agent and fetch tree on mount
-  useEffect(() => {
-    initMain().then(() => fetchTree());
-  }, [initMain, fetchTree]);
-
-  const { main, parts, subs, instances } = collectByRole(tree);
   const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [recentActivity, setRecentActivity] = useState<{ time: string; agent: string; event: string; detail: string }[]>([]);
+
+  const fetchRecentActivity = useCallback(async () => {
+    try {
+      const res = await apiClient.getPaginated<{ actorType: string; actorId: string | null; action: string; resource: string; detail: string | null; createdAt: string }>('/api/audit?page=1&limit=5');
+      if (res.data && res.data.length > 0) {
+        setRecentActivity(res.data.map(r => ({
+          time: new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          agent: r.actorType + (r.actorId ? ` #${r.actorId}` : ''),
+          event: r.action.replace(/_/g, ' '),
+          detail: r.detail ? (r.detail.length > 60 ? r.detail.slice(0, 60) + '...' : r.detail) : r.resource,
+        })));
+      }
+    } catch {
+      // keep empty
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRecentActivity();
+  }, [fetchRecentActivity]);
+
+  const { main, parts, subs, instances } = collectByRole(tree);
 
   // Build mock task list from approval + agents
   const pendingTasks = pendingList.map((a) => ({
@@ -226,29 +262,6 @@ export function WorkspaceLayout() {
     return part?.color || PART_COLORS[index % PART_COLORS.length];
   };
 
-  // Activity log from audit_logs API
-  const [recentActivity, setRecentActivity] = useState<{ time: string; agent: string; event: string; detail: string }[]>([]);
-
-  const fetchRecentActivity = useCallback(async () => {
-    try {
-      const res = await apiClient.getPaginated<{ actorType: string; actorId: string | null; action: string; resource: string; detail: string | null; createdAt: string }>('/api/audit?page=1&limit=5');
-      if (res.data && res.data.length > 0) {
-        setRecentActivity(res.data.map(r => ({
-          time: new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          agent: r.actorType + (r.actorId ? ` #${r.actorId}` : ''),
-          event: r.action.replace(/_/g, ' '),
-          detail: r.detail ? (r.detail.length > 60 ? r.detail.slice(0, 60) + '...' : r.detail) : r.resource,
-        })));
-      }
-    } catch {
-      // keep empty
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchRecentActivity();
-  }, [fetchRecentActivity]);
-
   const displayLogs = recentActivity.length > 0
     ? recentActivity
     : [
@@ -284,11 +297,10 @@ export function WorkspaceLayout() {
           {main && (
             <MainAgentCard
               status={main.status}
+              statusMessage={main.statusMessage}
               pendingCount={pendingTasks.length}
-              onClick={() => {
-                setSelectedAgentId(main!.id);
-                openAgent(main!.id);
-              }}
+              onClick={() => setSelectedAgentId(main!.id)}
+              onDoubleClick={() => openAgent(main!.id)}
             />
           )}
 
@@ -373,9 +385,10 @@ export function WorkspaceLayout() {
                   pendingCount={pendingCount}
                   isSelected={selectedPartId === part.id}
                   onClick={() => {
-                    setSelectedPartId(part.id);
+                    setSelectedPartId(selectedPartId === part.id ? null : part.id);
                     setSelectedSubId(null);
                   }}
+                  onDoubleClick={() => openAgent(part.id)}
                 />
               );
             })
@@ -409,10 +422,10 @@ export function WorkspaceLayout() {
                   pendingCount={sub.children.filter((c) => c.status === 'pending').length}
                   completeCount={sub.children.filter((c) => c.status === 'idle' || c.status === 'stopped').length}
                   onClick={() => {
-                    setSelectedSubId(sub.id);
+                    setSelectedSubId(selectedSubId === sub.id ? null : sub.id);
                     setSelectedAgentId(sub.id);
-                    openAgent(sub.id);
                   }}
+                  onDoubleClick={() => openAgent(sub.id)}
                 />
               );
             })
@@ -425,10 +438,10 @@ export function WorkspaceLayout() {
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8, padding: '0 10px', position: 'relative', zIndex: 2 }}>
           <ColumnHeader
             title="Instance"
-            count={selectedSubId ? filteredInstances.length : 0}
+            count={filteredInstances.length}
           />
 
-          {selectedSubId && filteredInstances.length > 0 ? (
+          {filteredInstances.length > 0 ? (
             filteredInstances.map((inst) => {
               const partColor = selectedPartId
                 ? getPartColor(selectedPartId, parts.findIndex((p) => p.id === selectedPartId))
@@ -442,15 +455,13 @@ export function WorkspaceLayout() {
                   color={partColor}
                   isInstance
                   modelName="claude-sonnet"
-                  onClick={() => {
-                    setSelectedAgentId(inst.id);
-                    openAgent(inst.id);
-                  }}
+                  onClick={() => setSelectedAgentId(inst.id)}
+                  onDoubleClick={() => openAgent(inst.id)}
                 />
               );
             })
           ) : (
-            <ColumnEmpty text={selectedSubId ? "No instances running." : "Select a Sub project<br/>to view instances"} />
+            <ColumnEmpty text="Select a Sub<br/>to view instances." />
           )}
         </div>
       </div>

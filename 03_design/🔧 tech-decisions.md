@@ -18,9 +18,10 @@
 - CSS: Tailwind CSS + shadcn/ui (데이터 뷰, 설정 등 일반 UI)
 
 ## 4. 데이터베이스
-- 종류: SQLite (better-sqlite3, 동기 API)
-- ORM: Drizzle ORM (타입 안전, SQLite 네이티브 지원, 경량)
-- 호스팅: 로컬 파일 (`$CLAUDEMANAGER_HOME/data/claudemanager.db`)
+- 종류: PostgreSQL (로컬 설치, port 5433)
+- ORM: Drizzle ORM (drizzle-orm/pg-core, 타입 안전)
+- 드라이버: node-postgres (pg)
+- 호스팅: 로컬 PostgreSQL (`postgresql://claudemanager:claudemanager@localhost:5433/claudemanager`)
 - 마이그레이션: Drizzle Kit
 
 ## 5. 서버 / 인프라
@@ -43,62 +44,42 @@
 - 재연결: 자동 재연결 (exponential backoff)
 - 프로토콜: JSON 메시지 (type + payload 구조)
 
-## 8. 3D 워크스페이스 렌더링 (데스크톱 전용)
+## 8. 대시보드 UI 스타일 (데스크톱 전용)
 
-### 엔진 선택: Three.js + React Three Fiber
+> ⚠️ **변경 이력 (2026-04-16):** 기존 3D 워크스페이스(Three.js + R3F) 방식은 **폐기**.
+> SugarCRM Customer Journey 스타일 **플랫 대시보드**로 전환 확정.
 
-| 후보 | 장점 | 단점 | 판정 |
-|---|---|---|---|
-| **Three.js + R3F** | WebGL 3D 렌더링, React 생태계 통합, 성숙한 커뮤니티, 로우폴리 카툰 스타일 적합 | 학습 곡선 존재 | **채택** |
-| PixiJS | 2D 렌더링 최적화, 가벼움 | 3D 카툰 스타일 표현 불가 | 미채택 |
-| Phaser | 게임 엔진 풀세트 | 오버스펙, 3D 미지원 | 미채택 |
-| 순수 Canvas | 의존성 없음 | 3D 렌더링 불가 | 미채택 |
+### UI 패턴: SugarCRM 4컬럼 플로우
+- **레이아웃**: Main → Part → Sub → Instance 4컬럼 카드 플로우
+- **TopNav**: SugarCRM pill-tab 스타일 (active = #10141A 다크 필, inactive = 텍스트만)
+- **콘텐츠 영역**: Content Card (#F3F5F7, border-radius 20px) on Page BG (#E8ECEF)
+- **인터랙션**: Part 클릭 → Sub 필터링 → Instance 필터링 (계층적 드릴다운)
+- **노트 탭**: 옵시디언 스타일 폴더 트리 + 마크다운 렌더링
 
-### Three.js + R3F 사용 방식
-- `@react-three/fiber` — React 컴포넌트로 Three.js 통합
-- `@react-three/drei` — 헬퍼 (OrbitControls, Environment, 등)
-- 3D 모델: `.glb/.gltf` 형식 (로우폴리 카툰 스타일)
-- 카메라: 고정 아이소메트릭 앵글 (OrthographicCamera)
-- 상호작용: Raycasting으로 캐릭터 클릭 → React 팝업 모달 트리거
+### 디자인 토큰
+- Page BG: `#E8ECEF`
+- Content Card BG: `#F3F5F7`
+- Dark elements: `#10141A`
+- Accent Purple: `#7C5CFC`
+- Border: `#E5E7EB`
 
-### 성능 최적화 전략
-- **로우폴리 모델**: 캐릭터당 1~2k 폴리곤
-- **GPU 인스턴싱**: 동일 모델 에이전트는 InstancedMesh로 일괄 렌더링
-- **LOD (Level of Detail)**: 카메라 거리에 따라 디테일 단계 자동 조절
-- **Draco 압축**: 3D 모델 용량 80% 절감
-- **동적 로딩**: React.lazy + Suspense로 3D 씬 코드 분할
-- **모바일 분기**: 모바일에서는 3D 로딩하지 않음 (번들 자체를 분리)
+### 레퍼런스
+- **SugarCRM Customer Journey CRM Dashboard** — 컬럼 플로우, pill-tab 네비게이션
+- **Obsidian** — 노트 탭 폴더 트리 + 마크다운 렌더링
 
-### 3D 에셋
-- 모델 형식: `.glb` (바이너리 glTF, Draco 압축)
-- 에셋 관리: `/public/assets/models/` 디렉토리
-- 캐릭터 리깅: 상태별 애니메이션 (타이핑, 대기, 당황, 기쁨 등)
-- 환경: 워크스페이스 가구, 바닥, 벽 등 모듈형 에셋
-
-### 3D 에셋 제작 파이프라인
-- **AI 3D 생성**: Meshy, Tripo3D, Luma Genie로 텍스트→3D 모델 초안 생성
-- **Blender 후보정**: AI 생성 모델 최적화, 리깅, 애니메이션 추가
-- **무료 에셋 활용**: Sketchfab, Kenney 로우폴리 카툰 에셋 커스터마이징
-- **컨셉 아트**: Midjourney / DALL-E로 3D 워크스페이스 분위기, 캐릭터 컨셉 이미지 생성
-- **UI 레이아웃**: v0.dev (Vercel)로 React UI 코드 프로토타입 생성
-- **와이어프레임 피드백**: Claude (비전)로 스케치 → 피드백 → 개선 반복
-- designer 에이전트가 설계 단계에서 위 도구들을 활용하여 진행
-
-### 레퍼런스 비주얼
-- **Versa Metaverse Landing Page** (Dribbble) — 3D 카툰 캐릭터 + 몽환적 파스텔 환경
-- 로우폴리 + 소프트 라이팅 + 보케 효과의 따뜻한 메타버스 분위기
-
-## 9. 터미널 렌더링
+## 9. 터미널 렌더링 (CLI 탭 전용)
 - xterm.js + @xterm/addon-fit (터미널 크기 자동 조정)
 - node-pty (서버 측 PTY 할당)
 - WebSocket으로 stdin/stdout 양방향 릴레이
-- 팝업 모달 내 탭에서 렌더링
+- 팝업 모달 내 CLI 탭에서 렌더링
+- **용도:** 개발자용 디버깅 터미널 — 에이전트의 실제 CLI 화면을 직접 확인
+- **주의:** 에이전트 통신(채팅/명령)은 node-pty가 아닌 `child_process.spawn` + JSON 모드 사용 (14번 참고)
 
 ## 10. 채팅 UI
 - 직접 구현 (React 컴포넌트)
   - 외부 라이브러리 불필요한 수준의 심플한 채팅 구조
   - 메시지 목록 + 입력창 + 타이핑 인디케이터
-- 메시지 저장: SQLite (채팅 이력 DB 저장)
+- 메시지 저장: PostgreSQL (채팅 이력 DB 저장)
 - 실시간: WebSocket으로 Main ↔ 웹앱 메시지 전달
 - 마크다운 지원: 보고 내용에 코드블록, 테이블 등 포함 가능
 
@@ -119,12 +100,362 @@
   - 프로세스 복구: PM2 자동 재시작 + 노트 기반 컨텍스트 복구
 - 에이전트 규모가 커지면 Phase 2에서 작업 큐 도입 검토
 
-## 14. AI Gateway
-- LiteLLM: 프록시 모드로 실행 (localhost:4000)
-- 모든 모델 호출은 LiteLLM 경유 (직접 API 호출 금지)
-- 토큰/비용 수집: LiteLLM 콜백으로 자동 기록
+## 14. 에이전트 실행 모델 (핵심 아키텍처 결정)
 
-## 15. 세션 관리
+> ⚠️ **최중요 결정 (2026-04-16 확정)**
+> Claude API(토큰당 과금)는 사용하지 않는다. 비용 문제.
+> 모든 에이전트는 **Claude Code CLI(구독제)** 로 실행한다.
+
+### Claude API vs Claude Code CLI
+
+| 구분 | Claude API | Claude Code CLI |
+|------|-----------|-----------------|
+| 과금 | 토큰당 과금 (input/output) | 월 구독 정액 (Pro/Max) |
+| 실행 | HTTP API 호출 | 터미널 프로세스 (CLI) |
+| 도구 | Tool Use 직접 정의 필요 | 파일 R/W, Bash, Agent 등 내장 |
+| 에이전트 생성 | 직접 구현 필요 | `Agent` 도구로 서브에이전트 즉시 생성 |
+| 비용 예측 | 사용량에 비례 (예측 어려움) | 월 고정 (예측 가능) |
+| **판정** | **미채택** | **채택** |
+
+### 웹 서버 ↔ CLI 통신 구조
+
+> ⚠️ **핵심 결정 (2026-04-16 확정)**
+> node-pty(터미널 에뮬레이션)는 CLI 탭 전용.
+> 채팅/명령 통신은 **child_process.spawn + JSON 모드**로 처리한다.
+
+#### 통신 방식 비교
+
+| 방식 | 설명 | 문제점 | 판정 |
+|------|------|--------|------|
+| **node-pty** | 터미널 화면 재현 (ANSI 코드 포함) | 색상·커서 코드 파싱 필요, 비효율 | CLI 탭 전용 |
+| **child_process.spawn** | Node.js 기본 내장 프로그램 실행기 | 없음 (설치 불필요) | **채택** |
+| Claude Code SDK | Node.js 라이브러리 직접 호출 | API 과금 방식 | 미채택 |
+
+#### 용도별 통신 분리
+
+| 용도 | 방식 | 이유 |
+|------|------|------|
+| **사용자 ↔ Main 대화** | `child_process.spawn` + `--print --output-format stream-json` | 구조화된 JSON 응답, 파싱 쉬움 |
+| **명령 실행 / 태스크** | `child_process.spawn` + `--print --output-format stream-json` | 결과를 JSON으로 받아 DB 저장 |
+| **CLI 탭 (디버깅)** | `node-pty` + xterm.js | 실시간 터미널 직접 보기 (개발자용) |
+| **서브에이전트 생성** | Main이 `--print` 모드로 서브 CLI 실행 | 에이전트 간 통신도 JSON |
+
+#### 전체 통신 흐름
+
+```
+┌─────────────┐   WebSocket    ┌──────────────┐  child_process    ┌──────────────────────┐
+│  브라우저    │ ◄───────────► │  Next.js     │ ◄───────────────► │  claude --print      │
+│  (채팅 UI)  │  JSON 전달     │  서버        │  spawn + JSON     │  --output-format     │
+└─────────────┘                └──────────────┘  stream            │  stream-json         │
+                                                                   └──────────────────────┘
+```
+
+```
+1. 사용자가 채팅에서 "개발 파트 만들어줘" 입력
+         ↓
+2. 브라우저 → WebSocket → Next.js 서버
+         ↓
+3. Next.js 서버 → child_process.spawn으로 CLI 실행
+   spawn('claude', ['--print', '--output-format', 'stream-json'])
+   stdin에 사용자 메시지 전달
+         ↓
+4. Claude Code CLI가 처리 → JSON 스트림으로 응답
+   stdout: {"type":"assistant","message":"Dev Part를 생성합니다..."}
+   stdout: {"type":"tool_use","tool":"Write","path":"skills/dev-part.md"}
+   stdout: {"type":"result","content":"Dev Part 생성 완료"}
+         ↓
+5. Next.js 서버 → JSON 파싱 → WebSocket → 브라우저에 표시
+```
+
+#### child_process.spawn 설명
+
+Node.js 기본 내장 기능으로, **코드 안에서 터미널 명령어를 실행**하는 것이다.
+별도 설치 불필요 (Node.js 자체 제공).
+
+```typescript
+import { spawn } from 'child_process';  // Node.js 기본 모듈
+
+// Claude Code CLI를 JSON 모드로 실행
+const agent = spawn('claude', [
+  '--print',
+  '--output-format', 'stream-json'
+]);
+
+// 사용자 메시지 전달 (stdin)
+agent.stdin.write('개발 파트 만들어줘\n');
+agent.stdin.end();
+
+// Claude 응답 수신 (stdout) — 순수 JSON, ANSI 코드 없음
+agent.stdout.on('data', (data) => {
+  const response = JSON.parse(data.toString());
+  // → { type: "result", content: "Dev Part 생성 완료" }
+  // → WebSocket으로 브라우저에 전달
+});
+```
+
+### 에이전트 실행 구조
+
+```
+사용자 → YJ Manager (웹 UI)
+              ↓ WebSocket
+         Next.js 서버
+              ↓ child_process.spawn (JSON 모드)
+         Main (Claude Code CLI)
+              ↓ Agent 도구 / 서브프로세스 생성
+         Part (Claude Code 서브에이전트)
+              ↓
+         Sub / Instance (Claude Code 서브에이전트)
+```
+
+### 계층별 실행 방식
+
+| 계층 | 실행 방식 | 생명 주기 |
+|------|----------|-----------|
+| **Main** | tmux 세션에서 Claude Code CLI 상시 실행 | 서버 시작 ~ 종료 (PM2 관리) |
+| **Part** | Main이 Agent 도구로 생성하는 서브에이전트 | 태스크 단위 (생성 → 완료 → 종료) |
+| **Sub** | Part가 Agent 도구로 생성하는 서브에이전트 | 프로젝트 단위 |
+| **Instance** | Sub가 Agent 도구로 생성하는 서브에이전트 | 작업 단위 (가장 짧은 생명 주기) |
+
+### Skill = 에이전트 지시서
+
+Skill은 Claude Code CLI에 전달하는 **시스템 프롬프트 + 도구 권한 설정**이다:
+
+```bash
+# 예시: Dev Part Skill
+claude --print --output-format stream-json \
+       --system-prompt "$(cat skills/dev-part.md)" \
+       --allowedTools "Read,Write,Edit,Bash,Agent" \
+       --workdir "/project/workspace"
+```
+
+Skill 파일(`.md`)에 역할, 규칙, 사용 도구, 작업 범위를 정의.
+Main과 대화를 통해 Skill을 생성/수정하고, 파일로 저장 후 에이전트에 적용.
+
+### 비용 관리
+
+- Claude API를 사용하지 않으므로 **토큰 비용 = 0**
+- 비용 = Claude Code 구독료 (월 고정)
+- Resources 페이지의 비용 대시보드는 **구독 플랜 대비 사용량** 모니터링 용도로 변경
+- 과도한 사용 시 Rate Limit은 Anthropic 측에서 자동 관리
+
+### 기존 LiteLLM (AI Gateway) — 폐기
+
+> ~~LiteLLM: 프록시 모드로 실행 (localhost:4000)~~
+> ~~모든 모델 호출은 LiteLLM 경유~~
+>
+> **폐기 사유:** Claude API를 사용하지 않으므로 API 프록시 불필요.
+> Claude Code CLI가 직접 Anthropic 서버와 통신하며, 구독 요금 내에서 처리된다.
+
+## 15. 안정성 설계 (Reliability)
+
+> 멀티 에이전트 시스템에서 발생할 수 있는 7가지 불안정 포인트와 대응 방안.
+> 모든 대응은 현재 기술 스택(Claude Code CLI + child_process.spawn + tmux + PostgreSQL) 내에서 구현.
+
+### 15-1. 프로세스 장애 복구
+
+**문제:** Main이 작업 중 갑자기 종료 → 하위 Part/Sub/Instance 전부 고아 상태
+
+**대응:**
+
+| 계층 | 보호 장치 | 동작 |
+|------|----------|------|
+| Main | PM2 프로세스 관리 | 비정상 종료 감지 → 자동 재시작 (max 5회/10분) |
+| Main | tmux 세션 유지 | 프로세스 죽어도 세션은 살아있음 → 재연결 가능 |
+| 전체 | 체크포인트 시스템 | 각 작업 단계 완료 시 `.orchestrator/checkpoint.json`에 상태 저장 |
+| 전체 | DB 상태 동기화 | `agents` 테이블에 `last_checkpoint`, `last_active_at` 기록 |
+
+**체크포인트 구조:**
+```json
+{
+  "agent_id": "main",
+  "timestamp": "2026-04-16T14:30:00Z",
+  "state": "working",
+  "current_task": "Dev Part 프론트엔드 작업 감독",
+  "completed": ["Part 생성", "Skill 적용", "Sub 3개 생성"],
+  "pending": ["프론트엔드 대시보드 검수", "백엔드 API 테스트"],
+  "context_summary": "프로젝트 진행률 60%. Frontend Sub 작업 중..."
+}
+```
+
+**재시작 시 복구 흐름:**
+```
+1. PM2가 Main 재시작
+2. Main CLI 시작 시 --system-prompt에 체크포인트 내용 주입
+3. "이전 작업 이어서 진행" 모드로 시작
+4. 고아 상태 하위 에이전트 탐색 → 재연결 또는 정리
+```
+
+### 15-2. 메시지 유실 방지
+
+**문제:** Main → Part로 지시를 보냈는데 Part가 못 받음
+
+**대응:**
+- 모든 지시/보고를 **DB에 먼저 저장** 후 전달 (Write-Ahead)
+- 메시지 상태 추적:
+
+```
+messages 테이블:
+┌────┬──────────┬──────────┬───────────┬───────────┐
+│ id │ from     │ to       │ content   │ status    │
+├────┼──────────┼──────────┼───────────┼───────────┤
+│ 1  │ main     │ dev-part │ "FE 작업" │ delivered │
+│ 2  │ main     │ qa-part  │ "테스트"  │ sent      │  ← 아직 미전달
+│ 3  │ dev-part │ main     │ "완료"    │ processed │
+└────┴──────────┴──────────┴───────────┴───────────┘
+```
+
+- 상태 흐름: `created → sent → delivered → processed`
+- `sent` 상태에서 **30초 이내** `delivered` 안 되면 자동 재전송 (최대 3회)
+- 웹 UI 대시보드에 "전달 실패" 표시 + 수동 재전송 버튼
+
+### 15-3. 결과물 검증
+
+**문제:** 에이전트가 엉뚱한 결과를 낸다 ("로그인 만들어줘" → 회원가입을 만듦)
+
+**대응:**
+- Skill에 **작업 범위 제한** 명시:
+
+```markdown
+# Skill: Frontend Developer
+## 허용 범위
+- 작업 디렉토리: src/components/, src/app/
+- 허용 명령어: pnpm, next, tsc
+- 금지: rm -rf, git push, DB 직접 접근
+
+## 완료 조건
+- 파일이 실제로 생성/수정되었는지 확인
+- `pnpm build` 성공 여부 확인
+- 변경 파일 목록 보고 필수
+```
+
+- 자동 검증 단계 (에이전트 작업 완료 시):
+
+| 검증 항목 | 방법 | 실패 시 |
+|-----------|------|---------|
+| 파일 존재 확인 | `fs.existsSync()` | 재작업 지시 |
+| 빌드 성공 | `pnpm build` 실행 | 에러 로그 포함 재작업 |
+| 테스트 통과 | `pnpm test` 실행 | 실패 항목 포함 재작업 |
+| Skill 범위 준수 | 변경 파일 경로 검증 | 범위 외 변경 롤백 |
+
+- **Human-in-the-Loop**: 주요 결과물(Part 생성, 프로젝트 완료 등)은 사용자 승인 후 다음 단계 진행
+
+### 15-4. 컨텍스트 보존
+
+**문제:** CLI 재시작 → 이전 대화 내용 모두 소실 → 처음부터 다시
+
+**대응:**
+- 3중 컨텍스트 보존:
+
+| 보존 방법 | 저장 위치 | 용도 |
+|-----------|----------|------|
+| **CLAUDE.md** | 프로젝트 루트 | 프로젝트 전체 맥락 (영구) |
+| **체크포인트 노트** | `.orchestrator/checkpoint.json` | 현재 작업 상태 (작업 단위) |
+| **DB 대화 이력** | `messages` 테이블 | 전체 대화 기록 (영구) |
+
+- 재시작 시 주입 순서:
+```
+1. CLAUDE.md (프로젝트 맥락)
+2. 체크포인트 (마지막 작업 상태)
+3. 최근 대화 N건 (직전 컨텍스트)
+→ --system-prompt에 통합하여 CLI에 전달
+```
+
+### 15-5. 파일 충돌 방지
+
+**문제:** 여러 에이전트가 같은 파일을 동시에 수정 → 충돌
+
+**대응:**
+- **워크스페이스 분리 원칙:**
+
+```
+project/
+├── workspace/           ← Main 관리 영역
+│   ├── .orchestrator/   ← Main 전용 (노트, 체크포인트)
+│   ├── src/
+│   │   ├── frontend/    ← Frontend Sub 전용
+│   │   ├── backend/     ← Backend Sub 전용
+│   │   └── shared/      ← Main 경유로만 수정 가능
+│   └── package.json     ← Main 경유로만 수정 가능
+```
+
+- **공유 파일 수정 규칙:**
+  - 공유 파일(`package.json`, `tsconfig.json` 등)은 **Main/Part를 경유**해서만 수정
+  - 하위 에이전트가 직접 수정 금지 → Skill에 제한 명시
+  - 필요 시 Main에게 수정 요청 보고 → Main이 단일 지점에서 수정
+
+- **git worktree 활용 (Phase 2):**
+  - 각 Sub가 별도 브랜치에서 작업
+  - 완료 시 Main이 merge 검토 → 충돌 해결 → 병합
+
+### 15-6. 에러 격리 (연쇄 실패 방지)
+
+**문제:** Instance 실패 → Sub 실패 → Part 실패 → Main 전체 중단
+
+**대응:**
+- **프로세스 수준 격리**: 각 에이전트가 독립 프로세스 → 하위 장애가 상위를 죽이지 않음
+- **에러 처리 계층:**
+
+```
+Instance 실패
+  → Sub가 받음: 재시도 (최대 3회)
+    → 재시도 실패: Part에 에러 보고
+      → Part가 판단: 다른 Instance로 재할당 or 우회
+        → 우회 실패: Main에 에스컬레이션
+          → Main: 사용자에게 알림 + 수동 개입 요청
+```
+
+- **에러 보고 구조:**
+```json
+{
+  "error_id": "err-001",
+  "agent": "frontend-instance-1",
+  "type": "build_failure",
+  "message": "pnpm build failed: Module not found",
+  "retry_count": 3,
+  "escalated_to": "dev-part",
+  "user_action_required": false
+}
+```
+
+- **차단벽 (Bulkhead) 패턴:**
+  - Part 간 완전 독립: Dev Part 실패해도 QA Part는 영향 없음
+  - Sub 간 독립: Frontend 실패해도 Backend는 계속 작업
+
+### 15-7. Rate Limit 관리
+
+**문제:** 에이전트 5개가 동시에 Claude 호출 → Rate Limit → 전부 멈춤
+
+**대응:**
+- **동시 실행 제한:**
+
+| 설정 항목 | 기본값 | 설정 위치 |
+|-----------|--------|----------|
+| 동시 활성 에이전트 수 | 3개 | Settings > Global Settings |
+| Part당 최대 Sub 수 | 3개 | Settings > Part Policies |
+| 에이전트 간 실행 간격 | 5초 | Settings > Global Settings |
+
+- **실행 큐 (우선순위 기반):**
+```
+실행 대기열:
+┌──────────────────────────────────────────────────────┐
+│ [실행 중] Agent-1 🔴, Agent-2 🟠, Agent-3 🔵        │
+│ [대기]    Agent-4 🟠 (예상 대기: 2분)  ← 높은 순위  │
+│ [대기]    Agent-5 🔵 (예상 대기: 5분)                │
+│ [대기]    Agent-6 ⚪ (예상 대기: 10분) ← 낮은 순위  │
+└──────────────────────────────────────────────────────┘
+```
+  - **우선순위 순서**로 실행: 🔴 Urgent > 🟠 High > 🔵 Normal > ⚪ Low
+  - 동일 우선순위 내에서는 FIFO (먼저 요청한 순)
+  - 🔴 Urgent 업무 진입 시 ⚪ Low 에이전트를 일시 중지하고 먼저 실행 가능
+  - 대시보드에 실행/대기 상태 + 우선순위 실시간 표시
+
+- **Rate Limit 감지 시:**
+  - Claude Code CLI가 429 에러 반환 → 자동 대기
+  - exponential backoff: 30초 → 60초 → 120초
+  - 3회 연속 Rate Limit → 모든 에이전트 일시 정지 + 사용자 알림
+  - 대시보드에 "Rate Limit 상태" 경고 표시
+
+## 16. 세션 관리
 - tmux: 에이전트별 세션 분리
 - tmux 명령: Node.js child_process로 실행
 - 세션 목록/상태: `tmux list-sessions` 파싱
@@ -141,7 +472,7 @@
 - 모든 재시도 실패 시: 에이전트 정지 + 대표 알림
 
 ## 18. 백업
-- SQLite: 일 1회 자동 백업 (`.backup` 명령 또는 파일 복사)
+- PostgreSQL: 일 1회 자동 백업 (`pg_dump` 사용)
 - `.orchestrator/`: git 기반 자동 커밋 (일 1회) 또는 rsync
 - 백업 경로: `$CLAUDEMANAGER_HOME/backups/`
 - 보관 기간: 최근 30일

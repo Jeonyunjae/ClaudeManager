@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YJ Manager — Settings</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg-page: #E8ECEF;
+    --bg-card: #FFFFFF;
+    --bg-content-card: #F3F5F7;
+    --bg-dark-card: #10141A;
+    --text-primary: #10141A;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+    --border-light: #E5E7EB;
+    --accent-purple: #7C5CFC;
+    --accent-purple-hover: #6D4FE0;
+    --accent-mint: #34D399;
+    --accent-amber: #F59E0B;
+    --status-error: #EF4444;
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-size: 13px; line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* Top Nav */
+  .top-nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 56px;
+    background: rgba(232,236,239,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-light);
+  }
+  .nav-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+  .nav-logo-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--text-primary); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+  }
+  .nav-tabs { display: flex; align-items: center; gap: 0; }
+  .nav-tab {
+    padding: 6px 20px; border-radius: 20px;
+    font-size: 14px; font-weight: 500; color: var(--text-secondary);
+    cursor: pointer; border: none; background: transparent;
+    text-decoration: none; letter-spacing: -0.01em;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .nav-tab:hover { color: var(--text-primary); }
+  .nav-tab.active { background: var(--text-primary); color: white; font-weight: 600; }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .nav-icon-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: none; background: transparent; color: var(--text-secondary);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Content Card */
+  .content-card {
+    background: var(--bg-content-card);
+    border-radius: 20px;
+    margin: 16px 20px;
+    padding: 24px;
+    min-height: calc(100vh - 56px - 68px);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+  }
+
+  /* Settings Layout */
+  .settings-layout {
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  /* Sub Tabs (horizontal) */
+  .sub-tabs {
+    display: flex; gap: 2px;
+    background: rgba(0,0,0,0.04); border-radius: 10px; padding: 3px;
+    width: fit-content;
+  }
+  .sub-tab {
+    padding: 7px 16px; border-radius: 8px; border: none;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    background: transparent; color: var(--text-secondary);
+    font-family: inherit; transition: all 0.15s;
+  }
+  .sub-tab.active { background: white; color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .sub-tab:hover:not(.active) { color: var(--text-primary); }
+
+  /* Content */
+  .settings-content { flex: 1; }
+  .settings-section {
+    background: var(--bg-card); border-radius: 14px;
+    box-shadow: var(--shadow-card); padding: 24px;
+    margin-bottom: 16px;
+  }
+  .settings-section-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .settings-section-desc { font-size: 12px; color: var(--text-tertiary); margin-bottom: 20px; }
+
+  .setting-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; border-bottom: 1px solid #F3F4F6;
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-info { flex: 1; }
+  .setting-label { font-size: 13px; font-weight: 500; }
+  .setting-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+  .setting-control { flex-shrink: 0; margin-left: 16px; }
+
+  .setting-input {
+    width: 120px; padding: 7px 12px; border-radius: 8px;
+    border: 1px solid var(--border-light); font-size: 13px;
+    font-family: inherit; outline: none; text-align: right;
+  }
+  .setting-input:focus { border-color: var(--accent-purple); }
+
+  .setting-select {
+    padding: 7px 12px; border-radius: 8px;
+    border: 1px solid var(--border-light); font-size: 13px;
+    font-family: inherit; outline: none; background: white; cursor: pointer;
+  }
+
+  /* Toggle Switch */
+  .toggle {
+    width: 44px; height: 24px; border-radius: 12px;
+    background: #D1D5DB; border: none; cursor: pointer;
+    position: relative; transition: background 0.2s;
+  }
+  .toggle.on { background: var(--accent-purple); }
+  .toggle::after {
+    content: ''; position: absolute;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: white; top: 3px; left: 3px;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .toggle.on::after { transform: translateX(20px); }
+
+  /* API Key Table */
+  .key-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  .key-table th {
+    text-align: left; font-size: 10px; font-weight: 600;
+    color: var(--text-tertiary); text-transform: uppercase;
+    letter-spacing: 0.04em; padding: 8px 10px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .key-table td {
+    padding: 10px; font-size: 12px; border-bottom: 1px solid #F9FAFB; vertical-align: middle;
+  }
+  .key-name { font-weight: 500; }
+  .key-value {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    background: #F3F4F6; padding: 3px 8px; border-radius: 4px;
+    color: var(--text-secondary);
+  }
+  .key-status {
+    font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 10px;
+  }
+  .key-status.active { background: #D1FAE5; color: #065F46; }
+  .key-status.expired { background: #FEE2E2; color: #991B1B; }
+  .key-action-btn {
+    padding: 4px 10px; border-radius: 6px; border: none;
+    font-size: 11px; font-weight: 500; cursor: pointer;
+    background: #F3F4F6; color: var(--text-secondary); transition: all 0.15s;
+  }
+  .key-action-btn:hover { background: #E5E7EB; }
+  .key-action-btn.delete { color: var(--status-error); }
+  .key-action-btn.delete:hover { background: #FEE2E2; }
+
+  .add-key-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: 8px; border: 1.5px dashed var(--border-light);
+    background: transparent; color: var(--text-secondary);
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    transition: all 0.15s; margin-top: 12px;
+  }
+  .add-key-btn:hover { border-color: var(--accent-purple); color: var(--accent-purple); }
+
+  /* Backup */
+  .backup-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: #F9FAFB; border-radius: 8px; margin-bottom: 8px;
+  }
+  .backup-info { font-size: 12px; }
+  .backup-date { font-weight: 500; }
+  .backup-size { color: var(--text-tertiary); font-size: 11px; margin-left: 8px; }
+  .backup-btn {
+    padding: 5px 12px; border-radius: 6px; border: none;
+    font-size: 11px; font-weight: 500; cursor: pointer;
+    background: #DBEAFE; color: #1E40AF;
+  }
+
+  /* Save Bar */
+  .save-bar {
+    position: sticky; bottom: 0;
+    background: var(--bg-card); border-top: 1px solid var(--border-light);
+    padding: 12px 32px;
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    margin: 0 20px; border-radius: 0 0 20px 20px;
+  }
+  .save-btn {
+    padding: 9px 24px; border-radius: 10px; border: none;
+    font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .save-btn.primary {
+    background: var(--accent-purple); color: white;
+    box-shadow: 0 2px 8px rgba(124,92,252,0.25);
+  }
+  .save-btn.primary:hover { background: var(--accent-purple-hover); }
+  .save-btn.secondary { background: #F3F4F6; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<!-- Top Nav -->
+<nav class="top-nav">
+  <div class="nav-logo">
+    <div class="nav-logo-icon">YJ</div>
+    YJ Manager
+  </div>
+  <div class="nav-tabs">
+    <a href="dashboard-prototype.html" class="nav-tab" style="text-decoration:none;">Dashboard</a>
+    <a href="page-resources.html" class="nav-tab" style="text-decoration:none;">Resources</a>
+    <button class="nav-tab active">Settings</button>
+  </div>
+  <div class="nav-right">
+    <button class="nav-icon-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    </button>
+    <div style="width:32px;height:32px;border-radius:50%;background:#E5E7EB;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#6B7280;">YJ</div>
+  </div>
+</nav>
+
+<div class="content-card">
+  <div class="settings-layout">
+    <!-- Sub Tabs -->
+    <div class="sub-tabs">
+      <button class="sub-tab active">Global Settings</button>
+      <button class="sub-tab">Part Policies</button>
+      <button class="sub-tab">API Keys</button>
+      <button class="sub-tab">Backup / Restore</button>
+      <button class="sub-tab">My Profile</button>
+    </div>
+
+    <!-- Content -->
+    <div class="settings-content">
+      <!-- Global Settings -->
+      <div class="settings-section">
+        <div class="settings-section-title">Global Settings</div>
+        <div class="settings-section-desc">System-wide default configuration</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Monthly Cost Limit</div>
+            <div class="setting-hint">All agents stop + alert when limit exceeded</div>
+          </div>
+          <div class="setting-control"><input class="setting-input" type="text" value="$100.00" /></div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Max Agents</div>
+            <div class="setting-hint">Maximum concurrent agents</div>
+          </div>
+          <div class="setting-control"><input class="setting-input" type="number" value="10" /></div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Default Retry Count</div>
+            <div class="setting-hint">Auto retry count on agent error</div>
+          </div>
+          <div class="setting-control"><input class="setting-input" type="number" value="3" /></div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Notifications</div>
+            <div class="setting-hint">Browser push notifications</div>
+          </div>
+          <div class="setting-control"><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Cost Warning Threshold</div>
+            <div class="setting-hint">Alert when reaching N% of monthly limit</div>
+          </div>
+          <div class="setting-control">
+            <select class="setting-select"><option>60%</option><option selected>80%</option><option>90%</option></select>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Default Model</div>
+            <div class="setting-hint">Default model for new agents</div>
+          </div>
+          <div class="setting-control">
+            <select class="setting-select"><option selected>claude-opus-4</option><option>claude-sonnet-4</option><option>claude-haiku-4</option></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- API Keys -->
+      <div class="settings-section">
+        <div class="settings-section-title">API Keys</div>
+        <div class="settings-section-desc">Manage Anthropic API keys</div>
+
+        <table class="key-table">
+          <thead><tr><th>Name</th><th>Key</th><th>Status</th><th>Usage</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key-name">Primary Key</td>
+              <td><span class="key-value">sk-ant-...4k2f</span></td>
+              <td><span class="key-status active">Active</span></td>
+              <td style="font-size:11px;color:var(--text-secondary);">$12.40 / $100</td>
+              <td style="text-align:right;">
+                <button class="key-action-btn">Edit</button>
+                <button class="key-action-btn delete">Delete</button>
+              </td>
+            </tr>
+            <tr>
+              <td class="key-name">Backup Key</td>
+              <td><span class="key-value">sk-ant-...9x3m</span></td>
+              <td><span class="key-status expired">Expired</span></td>
+              <td style="font-size:11px;color:var(--text-tertiary);">—</td>
+              <td style="text-align:right;">
+                <button class="key-action-btn">Renew</button>
+                <button class="key-action-btn delete">Delete</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <button class="add-key-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add New API Key
+        </button>
+      </div>
+
+      <!-- Backup -->
+      <div class="settings-section">
+        <div class="settings-section-title">Backup / Restore</div>
+        <div class="settings-section-desc">Database auto backup status and manual backup</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Auto Backup</div>
+            <div class="setting-hint">Daily at 03:00, keep last 7 days</div>
+          </div>
+          <div class="setting-control"><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Backup History</div>
+          <div class="backup-item">
+            <div class="backup-info"><span class="backup-date">2026-04-16 03:00</span><span class="backup-size">24.3 MB</span></div>
+            <button class="backup-btn">Restore</button>
+          </div>
+          <div class="backup-item">
+            <div class="backup-info"><span class="backup-date">2026-04-15 03:00</span><span class="backup-size">23.8 MB</span></div>
+            <button class="backup-btn">Restore</button>
+          </div>
+          <div class="backup-item">
+            <div class="backup-info"><span class="backup-date">2026-04-14 03:00</span><span class="backup-size">22.1 MB</span></div>
+            <button class="backup-btn">Restore</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Save Bar -->
+<div class="save-bar">
+  <button class="save-btn secondary">Cancel</button>
+  <button class="save-btn primary">Save</button>
+</div>
+
+</body>
+</html>

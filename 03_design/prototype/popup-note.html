@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YJ Manager — 노트 탭</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg-page: #E8ECEF;
+    --bg-card: #FFFFFF;
+    --text-primary: #10141A;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+    --border-light: #E5E7EB;
+    --accent-purple: #7C5CFC;
+    --accent-blue: #3B82F6;
+    --accent-mint: #34D399;
+    --accent-amber: #F59E0B;
+    --shadow-popup: 0 20px 60px rgba(0,0,0,0.15);
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-size: 13px; line-height: 1.5;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+  }
+  .popup-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .popup {
+    width: 820px; max-height: 85vh; background: var(--bg-card);
+    border-radius: 18px; box-shadow: var(--shadow-popup);
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .popup-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 20px 24px 16px; border-bottom: 1px solid var(--border-light);
+  }
+  .popup-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; color: white;
+  }
+  .popup-header-info { flex: 1; }
+  .popup-header-name { font-size: 15px; font-weight: 600; }
+  .popup-header-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+  .popup-status-badge { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 10px; }
+  .popup-close {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: none; background: transparent; color: var(--text-tertiary);
+    cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .popup-close:hover { background: #F3F4F6; }
+  .popup-tabs { display: flex; border-bottom: 1px solid var(--border-light); }
+  .popup-tab {
+    flex: 1; padding: 12px; text-align: center;
+    font-size: 12px; font-weight: 500; color: var(--text-tertiary);
+    border: none; background: transparent; cursor: pointer;
+    position: relative; transition: color 0.15s; text-decoration: none;
+  }
+  .popup-tab:hover { color: var(--text-secondary); }
+  .popup-tab.active { color: var(--accent-purple); }
+  .popup-tab.active::after {
+    content: ''; position: absolute; bottom: 0;
+    left: 25%; right: 25%; height: 2px;
+    background: var(--accent-purple); border-radius: 2px;
+  }
+  .popup-content { flex: 1; overflow-y: auto; padding: 0; display: flex; }
+
+  /* ── Folder Tree ── */
+  .folder-tree {
+    width: 210px; flex-shrink: 0;
+    border-right: 1px solid var(--border-light);
+    padding: 16px 0;
+    overflow-y: auto;
+    background: #FAFBFC;
+  }
+  .tree-title {
+    font-size: 10px; font-weight: 600; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.04em;
+    padding: 0 16px 8px;
+  }
+  .tree-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 16px; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); cursor: pointer;
+    border: none; background: transparent; width: 100%;
+    text-align: left; transition: all 0.1s;
+  }
+  .tree-item:hover { background: rgba(0,0,0,0.03); }
+  .tree-item.active { background: #EDE9FE; color: var(--accent-purple); font-weight: 600; }
+  .tree-item .tree-indent { width: 16px; flex-shrink: 0; }
+  .tree-item .tree-icon { width: 14px; height: 14px; flex-shrink: 0; color: inherit; }
+  .tree-item .tree-arrow {
+    width: 12px; height: 12px; flex-shrink: 0; color: var(--text-tertiary);
+    transition: transform 0.15s;
+  }
+  .tree-item .tree-arrow.open { transform: rotate(90deg); }
+  .tree-count {
+    font-size: 9px; font-weight: 600; color: var(--text-tertiary);
+    background: rgba(0,0,0,0.05); padding: 1px 5px; border-radius: 8px;
+    margin-left: auto;
+  }
+  /* File items in tree */
+  .tree-file {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 16px; font-size: 11px; font-weight: 400;
+    color: var(--text-secondary); cursor: pointer;
+    border: none; background: transparent; width: 100%;
+    text-align: left; transition: all 0.1s;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tree-file:hover { background: rgba(0,0,0,0.03); }
+  .tree-file.active { background: #EDE9FE; color: var(--accent-purple); font-weight: 500; }
+  .tree-file .file-icon {
+    width: 12px; height: 12px; flex-shrink: 0; opacity: 0.5;
+  }
+  /* Collapsible children */
+  .tree-children { display: block; }
+  .tree-children.collapsed { display: none; }
+
+  /* ── Note Area (right side) ── */
+  .note-area {
+    flex: 1; overflow-y: auto; padding: 20px 24px;
+  }
+
+  /* ── Note List View ── */
+  .note-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .note-toolbar-left {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .note-count {
+    font-size: 12px; font-weight: 600; color: var(--text-primary);
+  }
+  .note-count span { color: var(--text-tertiary); font-weight: 400; }
+  .note-sort {
+    padding: 4px 8px; border-radius: 6px;
+    border: 1px solid var(--border-light); font-size: 10px;
+    color: var(--text-secondary); background: white; cursor: pointer;
+    font-family: inherit;
+  }
+  .note-search {
+    padding: 5px 10px; border-radius: 6px;
+    border: 1px solid var(--border-light); font-size: 11px;
+    outline: none; width: 160px; font-family: inherit;
+  }
+  .note-search:focus { border-color: var(--accent-purple); }
+
+  /* Note Cards */
+  .note-list {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .note-card {
+    background: #F9FAFB; border-radius: 10px;
+    padding: 14px 16px; cursor: pointer;
+    transition: all 0.15s; border: 1px solid transparent;
+  }
+  .note-card:hover { border-color: var(--border-light); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .note-card.pinned { border-color: var(--accent-amber); background: #FFFBEB; }
+
+  .note-card-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .note-card-title-row {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .note-card-pin {
+    width: 14px; height: 14px; color: var(--accent-amber);
+  }
+  .note-card-title {
+    font-size: 13px; font-weight: 600; color: var(--text-primary);
+  }
+  .note-card-actions {
+    display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s;
+  }
+  .note-card:hover .note-card-actions { opacity: 1; }
+  .note-card-action {
+    width: 24px; height: 24px; border-radius: 4px;
+    border: none; background: transparent; color: var(--text-tertiary);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .note-card-action:hover { background: rgba(0,0,0,0.06); color: var(--text-secondary); }
+
+  .note-card-body {
+    font-size: 12px; color: var(--text-secondary); line-height: 1.6;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .note-card-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 8px;
+  }
+  .note-card-tags {
+    display: flex; gap: 4px;
+  }
+  .note-tag {
+    font-size: 9px; font-weight: 500; padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .note-tag.status { background: #DBEAFE; color: #1E40AF; }
+  .note-tag.decision { background: #EDE9FE; color: #5B21B6; }
+  .note-tag.todo { background: #FEF3C7; color: #92400E; }
+  .note-tag.report { background: #D1FAE5; color: #065F46; }
+  .note-tag.config { background: #F3F4F6; color: var(--text-secondary); }
+
+  .note-card-meta {
+    font-size: 10px; color: var(--text-tertiary);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .note-card-file {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--text-tertiary); background: rgba(0,0,0,0.04);
+    padding: 1px 6px; border-radius: 3px;
+  }
+
+  /* ── Single Note View (Obsidian-like) ── */
+  .note-viewer { display: none; }
+  .note-viewer.active { display: block; }
+  .note-list-view.hidden { display: none; }
+
+  .note-viewer-breadcrumb {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 16px; font-size: 11px; color: var(--text-tertiary);
+  }
+  .note-viewer-breadcrumb a {
+    color: var(--accent-purple); text-decoration: none; cursor: pointer;
+  }
+  .note-viewer-breadcrumb a:hover { text-decoration: underline; }
+  .note-viewer-breadcrumb .sep { color: var(--text-tertiary); }
+
+  .note-viewer-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 12px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .note-viewer-title {
+    font-size: 18px; font-weight: 700; color: var(--text-primary);
+    line-height: 1.3;
+  }
+  .note-viewer-actions {
+    display: flex; gap: 4px; flex-shrink: 0; margin-left: 12px;
+  }
+  .note-viewer-action {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: 1px solid var(--border-light); background: white;
+    color: var(--text-secondary); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .note-viewer-action:hover { background: #F3F4F6; color: var(--text-primary); }
+
+  .note-viewer-meta {
+    display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+    font-size: 11px; color: var(--text-tertiary);
+  }
+  .note-viewer-meta-item {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .note-viewer-meta-item svg { width: 12px; height: 12px; }
+
+  .note-viewer-tags {
+    display: flex; gap: 4px; margin-bottom: 16px;
+  }
+
+  .note-viewer-body {
+    font-size: 13px; color: var(--text-primary); line-height: 1.8;
+  }
+  .note-viewer-body h2 {
+    font-size: 15px; font-weight: 700; margin: 20px 0 8px;
+    padding-bottom: 4px; border-bottom: 1px solid var(--border-light);
+  }
+  .note-viewer-body h3 {
+    font-size: 13px; font-weight: 600; margin: 16px 0 6px;
+  }
+  .note-viewer-body p {
+    margin: 8px 0;
+  }
+  .note-viewer-body ul, .note-viewer-body ol {
+    padding-left: 20px; margin: 6px 0;
+  }
+  .note-viewer-body li {
+    margin: 4px 0; line-height: 1.7;
+  }
+  .note-viewer-body code {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    background: rgba(0,0,0,0.06); padding: 2px 5px; border-radius: 3px;
+  }
+  .note-viewer-body pre {
+    background: #1E1E2E; color: #CDD6F4; border-radius: 8px;
+    padding: 14px 16px; margin: 10px 0; overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    line-height: 1.6;
+  }
+  .note-viewer-body blockquote {
+    border-left: 3px solid var(--accent-purple);
+    padding: 8px 14px; margin: 10px 0;
+    background: #F5F3FF; border-radius: 0 6px 6px 0;
+    color: var(--text-secondary); font-style: italic;
+  }
+  .note-viewer-body .checkbox-item {
+    display: flex; align-items: flex-start; gap: 6px; margin: 4px 0;
+  }
+  .note-viewer-body .checkbox {
+    width: 14px; height: 14px; border-radius: 3px;
+    border: 1.5px solid var(--border-light); flex-shrink: 0;
+    margin-top: 3px; display: flex; align-items: center; justify-content: center;
+  }
+  .note-viewer-body .checkbox.checked {
+    background: var(--accent-purple); border-color: var(--accent-purple);
+  }
+  .note-viewer-body .checkbox.checked svg { display: block; }
+  .note-viewer-body .strikethrough { text-decoration: line-through; color: var(--text-tertiary); }
+
+  /* Note Detail (old expanded, keep for fallback) */
+  .note-detail { display: none; }
+
+  .back-link {
+    display: block; text-align: center; margin-top: 20px;
+    font-size: 12px; color: var(--accent-purple); text-decoration: none;
+  }
+  .back-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="popup-overlay">
+  <div class="popup">
+    <!-- Header -->
+    <div class="popup-header">
+      <div class="popup-avatar" style="background:#10141A;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="popup-header-info">
+        <div class="popup-header-name">Main</div>
+        <div class="popup-header-meta">
+          <span class="popup-status-badge" style="background:#DBEAFE;color:#1E40AF;">Active</span>
+          <span style="font-size:11px;color:var(--text-tertiary);">Main · claude-opus-4</span>
+        </div>
+      </div>
+      <button class="popup-close">×</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="popup-tabs">
+      <a href="popup-info.html" class="popup-tab" style="text-decoration:none;">정보</a>
+      <a href="popup-cli.html" class="popup-tab" style="text-decoration:none;">CLI</a>
+      <a href="popup-chat.html" class="popup-tab" style="text-decoration:none;">대화</a>
+      <a href="popup-log.html" class="popup-tab" style="text-decoration:none;">로그</a>
+      <button class="popup-tab active">노트</button>
+    </div>
+
+    <!-- Content: Note -->
+    <div class="popup-content">
+      <!-- Folder Tree -->
+      <div class="folder-tree">
+        <div class="tree-title">Agent Tree</div>
+
+        <!-- Main -->
+        <button class="tree-item active" data-agent="main" onclick="toggleFolder(this); selectAgent('main')">
+          <svg class="tree-arrow open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          <svg class="tree-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>
+          Main
+          <span class="tree-count">5</span>
+        </button>
+        <div class="tree-children" data-parent="main">
+          <button class="tree-file" data-note="status" onclick="openNote('status', this)">
+            <span class="tree-indent"></span>
+            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            status.md
+          </button>
+          <button class="tree-file" data-note="decisions" onclick="openNote('decisions', this)">
+            <span class="tree-indent"></span>
+            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            decisions.md
+          </button>
+          <button class="tree-file" data-note="todo" onclick="openNote('todo', this)">
+            <span class="tree-indent"></span>
+            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            todo.md
+          </button>
+          <button class="tree-file" data-note="parts" onclick="openNote('parts', this)">
+            <span class="tree-indent"></span>
+            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            parts.md
+          </button>
+          <button class="tree-file" data-note="errors" onclick="openNote('errors', this)">
+            <span class="tree-indent"></span>
+            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            errors.md
+          </button>
+        </div>
+
+        <!-- Dev Part -->
+        <button class="tree-item" data-agent="dev" onclick="toggleFolder(this); selectAgent('dev')">
+          <span class="tree-indent"></span>
+          <svg class="tree-arrow open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          <span style="width:8px;height:8px;border-radius:3px;background:#6366F1;flex-shrink:0;"></span>
+          Dev Part
+          <span class="tree-count">3</span>
+        </button>
+        <div class="tree-children" data-parent="dev">
+          <button class="tree-file" data-note="dev-progress" onclick="openNote('dev-progress', this)">
+            <span class="tree-indent"></span><span class="tree-indent"></span>
+            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            progress.md
+          </button>
+          <!-- Sub: Frontend -->
+          <button class="tree-item" data-agent="frontend" onclick="toggleFolder(this); selectAgent('frontend')" style="padding-left:0;">
+            <span class="tree-indent"></span><span class="tree-indent"></span>
+            <svg class="tree-arrow open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            Frontend
+            <span class="tree-count">2</span>
+          </button>
+          <div class="tree-children" data-parent="frontend">
+            <button class="tree-file" data-note="fe-components" onclick="openNote('fe-components', this)">
+              <span class="tree-indent"></span><span class="tree-indent"></span><span class="tree-indent"></span>
+              <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              components.md
+            </button>
+            <button class="tree-file" data-note="fe-routing" onclick="openNote('fe-routing', this)">
+              <span class="tree-indent"></span><span class="tree-indent"></span><span class="tree-indent"></span>
+              <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              routing.md
+            </button>
+          </div>
+          <!-- Sub: Backend -->
+          <button class="tree-item" data-agent="backend" onclick="toggleFolder(this); selectAgent('backend')" style="padding-left:0;">
+            <span class="tree-indent"></span><span class="tree-indent"></span>
+            <svg class="tree-arrow open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            Backend
+            <span class="tree-count">1</span>
+          </button>
+          <div class="tree-children" data-parent="backend">
+            <button class="tree-file" data-note="be-api" onclick="openNote('be-api', this)">
+              <span class="tree-indent"></span><span class="tree-indent"></span><span class="tree-indent"></span>
+              <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              api-spec.md
+            </button>
+          </div>
+        </div>
+
+        <!-- Design Part -->
+        <button class="tree-item" data-agent="design" onclick="toggleFolder(this); selectAgent('design')">
+          <span class="tree-indent"></span>
+          <svg class="tree-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          <span style="width:8px;height:8px;border-radius:3px;background:#E8606D;flex-shrink:0;"></span>
+          Design Part
+          <span class="tree-count">1</span>
+        </button>
+        <div class="tree-children collapsed" data-parent="design">
+          <button class="tree-file" data-note="design-research" onclick="openNote('design-research', this)">
+            <span class="tree-indent"></span><span class="tree-indent"></span>
+            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            research.md
+          </button>
+        </div>
+
+        <!-- QA Part -->
+        <button class="tree-item" data-agent="qa" onclick="toggleFolder(this); selectAgent('qa')">
+          <span class="tree-indent"></span>
+          <svg class="tree-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          <span style="width:8px;height:8px;border-radius:3px;background:#34D399;flex-shrink:0;"></span>
+          QA Part
+          <span class="tree-count">1</span>
+        </button>
+        <div class="tree-children collapsed" data-parent="qa">
+          <button class="tree-file" data-note="qa-plan" onclick="openNote('qa-plan', this)">
+            <span class="tree-indent"></span><span class="tree-indent"></span>
+            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            test-plan.md
+          </button>
+        </div>
+      </div>
+
+      <!-- Note Area (right side) -->
+      <div class="note-area">
+
+        <!-- === Note List View === -->
+        <div class="note-list-view" id="noteListView">
+          <!-- Toolbar -->
+          <div class="note-toolbar">
+            <div class="note-toolbar-left">
+              <span class="note-count" id="noteCountLabel">Main <span>5개 노트</span></span>
+              <select class="note-sort">
+                <option>최신순</option>
+                <option>이름순</option>
+                <option>고정 우선</option>
+              </select>
+            </div>
+            <input class="note-search" placeholder="노트 검색..." />
+          </div>
+
+          <!-- Note List -->
+          <div class="note-list">
+            <!-- Pinned Note -->
+            <div class="note-card pinned" onclick="openNote('status')">
+              <div class="note-card-header">
+                <div class="note-card-title-row">
+                  <svg class="note-card-pin" viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+                  <span class="note-card-title">프로젝트 현황 요약</span>
+                </div>
+                <div class="note-card-actions">
+                  <button class="note-card-action" title="편집" onclick="event.stopPropagation()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
+                  <button class="note-card-action" title="삭제" onclick="event.stopPropagation()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="note-card-body">
+                YJ Manager v1.0 개발 프로젝트 현황. Dev Part 60% 진행, Design Part 리서치 완료. QA Part 테스트 계획 수립 중. 전체 일정은 4/20 완료 목표.
+              </div>
+              <div class="note-card-footer">
+                <div class="note-card-tags">
+                  <span class="note-tag status">현황</span>
+                  <span class="note-tag report">보고</span>
+                </div>
+                <div class="note-card-meta">
+                  <span class="note-card-file">status.md</span>
+                  <span>14:10</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Note 2 -->
+            <div class="note-card" onclick="openNote('decisions')">
+              <div class="note-card-header">
+                <div class="note-card-title-row">
+                  <span class="note-card-title">아키텍처 결정 사항</span>
+                </div>
+                <div class="note-card-actions">
+                  <button class="note-card-action" title="편집" onclick="event.stopPropagation()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="note-card-body">
+                대시보드 UI: SugarCRM Customer Journey 스타일 4컬럼 플로우 채택. 상태관리: Zustand. DB: SQLite + Drizzle ORM.
+              </div>
+              <div class="note-card-footer">
+                <div class="note-card-tags">
+                  <span class="note-tag decision">결정</span>
+                </div>
+                <div class="note-card-meta">
+                  <span class="note-card-file">decisions.md</span>
+                  <span>13:20</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Note 3 -->
+            <div class="note-card" onclick="openNote('todo')">
+              <div class="note-card-header">
+                <div class="note-card-title-row">
+                  <span class="note-card-title">TODO 리스트</span>
+                </div>
+              </div>
+              <div class="note-card-body">
+                1. 프론트엔드 대시보드 카드 레이아웃 완성 (진행 중)
+                2. WebSocket 실시간 상태 업데이트 연결 (대기)
+                3. QA Part 테스트 시나리오 승인 후 실행 (승인 대기)
+              </div>
+              <div class="note-card-footer">
+                <div class="note-card-tags">
+                  <span class="note-tag todo">할일</span>
+                </div>
+                <div class="note-card-meta">
+                  <span class="note-card-file">todo.md</span>
+                  <span>12:00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Note 4 -->
+            <div class="note-card" onclick="openNote('parts')">
+              <div class="note-card-header">
+                <div class="note-card-title-row">
+                  <span class="note-card-title">파트 구성 현황</span>
+                </div>
+              </div>
+              <div class="note-card-body">
+                Dev Part (developer skill v1.0): 프론트엔드, 백엔드 Sub 운영 중. Design Part (planner skill v1.0): 리서치 Sub 완료.
+              </div>
+              <div class="note-card-footer">
+                <div class="note-card-tags">
+                  <span class="note-tag config">설정</span>
+                </div>
+                <div class="note-card-meta">
+                  <span class="note-card-file">parts.md</span>
+                  <span>09:30</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Note 5 -->
+            <div class="note-card" onclick="openNote('errors')">
+              <div class="note-card-header">
+                <div class="note-card-title-row">
+                  <span class="note-card-title">오류 대응 기록</span>
+                </div>
+              </div>
+              <div class="note-card-body">
+                [14:02] 테스터 E2E 테스트 timeout 30s 초과. 원인 분석: dev 서버 미시작 또는 포트 충돌 가능성.
+              </div>
+              <div class="note-card-footer">
+                <div class="note-card-tags">
+                  <span class="note-tag" style="background:#FEE2E2;color:#991B1B;">오류</span>
+                </div>
+                <div class="note-card-meta">
+                  <span class="note-card-file">errors.md</span>
+                  <span>14:05</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- === Single Note Viewer (Obsidian-like) === -->
+        <div class="note-viewer" id="noteViewer">
+          <div class="note-viewer-breadcrumb" id="noteBreadcrumb"></div>
+          <div class="note-viewer-header">
+            <div class="note-viewer-title" id="noteViewerTitle"></div>
+            <div class="note-viewer-actions">
+              <button class="note-viewer-action" title="새 탭에서 열기" onclick="openInNewTab()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </button>
+              <button class="note-viewer-action" title="편집">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button class="note-viewer-action" title="고정">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="note-viewer-meta" id="noteViewerMeta"></div>
+          <div class="note-viewer-tags" id="noteViewerTags"></div>
+          <div class="note-viewer-body" id="noteViewerBody"></div>
+        </div>
+
+      </div><!-- /note-area -->
+    </div>
+  </div>
+</div>
+
+<a class="back-link" href="dashboard-prototype.html">&larr; 대시보드로 돌아가기</a>
+
+<script>
+// ── Note Data Store ──
+const noteData = {
+  'status': {
+    title: '프로젝트 현황 요약',
+    path: '.orchestrator/status.md',
+    agent: 'Main',
+    modified: '14:10',
+    tags: ['현황', '보고'],
+    pinned: true,
+    body: `
+      <h2>YJ Manager v1.0 개발 프로젝트</h2>
+      <p>전체 프로젝트 진행률: <strong>45%</strong></p>
+
+      <h3>Part별 진행 현황</h3>
+      <ul>
+        <li><strong>Dev Part</strong> — 60% 진행
+          <ul>
+            <li>프론트엔드 UI 작업 중 (대시보드 컬럼 레이아웃)</li>
+            <li>백엔드 API 80% 완료 (인증, 에이전트 CRUD, 승인)</li>
+          </ul>
+        </li>
+        <li><strong>Design Part</strong> — 리서치 완료, 대기 중</li>
+        <li><strong>QA Part</strong> — 테스트 계획 수립 중, 승인 대기 1건</li>
+      </ul>
+
+      <h3>주요 이슈</h3>
+      <ul>
+        <li>E2E 테스트 timeout 오류 — 포트 충돌 가능성 조사 중</li>
+        <li>QA 테스트 시나리오 30건 승인 필요</li>
+      </ul>
+
+      <h3>일정</h3>
+      <ul>
+        <li>시작: 2026-04-10</li>
+        <li>목표 완료: 2026-04-20</li>
+        <li>총 비용: $12.40 / $100.00 (한도)</li>
+      </ul>
+
+      <blockquote>Dev Part 프론트엔드 작업이 크리티컬 패스. 4/16까지 대시보드 완료 필요.</blockquote>
+    `
+  },
+  'decisions': {
+    title: '아키텍처 결정 사항',
+    path: '.orchestrator/decisions.md',
+    agent: 'Main',
+    modified: '13:20',
+    tags: ['결정', '설정'],
+    body: `
+      <h2>ADR (Architecture Decision Records)</h2>
+
+      <h3>ADR-001: 대시보드 UI 패턴</h3>
+      <ul>
+        <li><strong>결정:</strong> SugarCRM Customer Journey 스타일 4컬럼 플로우</li>
+        <li><strong>이유:</strong> Main → Part → Sub → Instance 계층을 직관적으로 표현</li>
+        <li><strong>대안:</strong> Kanban (복잡도 부족), Tree View (시각적 매력 부족)</li>
+      </ul>
+
+      <h3>ADR-002: 상태 관리</h3>
+      <ul>
+        <li><strong>결정:</strong> Zustand (14개 store)</li>
+        <li><strong>이유:</strong> 보일러플레이트 최소, DevTools 지원, SSR 호환</li>
+      </ul>
+
+      <h3>ADR-003: 데이터베이스</h3>
+      <ul>
+        <li><strong>결정:</strong> SQLite + Drizzle ORM</li>
+        <li><strong>이유:</strong> 로컬 실행, 설치 불필요, 파일 기반 백업 용이</li>
+      </ul>
+
+      <h3>ADR-004: 터미널 인터페이스</h3>
+      <pre>tmux (세션 관리)
+ └─ node-pty (프로세스 제어)
+     └─ xterm.js (웹 렌더링)</pre>
+
+      <h3>ADR-005: 승인 흐름</h3>
+      <ul>
+        <li><strong>결정:</strong> Human-in-the-Loop 승인 (cost, destructive, external)</li>
+        <li><strong>timeout:</strong> 30분, 알림: macOS notification + 대시보드 뱃지</li>
+      </ul>
+    `
+  },
+  'todo': {
+    title: 'TODO 리스트',
+    path: '.orchestrator/todo.md',
+    agent: 'Main',
+    modified: '12:00',
+    tags: ['할일'],
+    body: `
+      <h2>진행 중</h2>
+      <div class="checkbox-item">
+        <div class="checkbox"></div>
+        <span>프론트엔드 대시보드 카드 레이아웃 완성</span>
+      </div>
+      <div class="checkbox-item">
+        <div class="checkbox"></div>
+        <span>SugarCRM 스타일 TopNav 구현</span>
+      </div>
+
+      <h2>대기</h2>
+      <div class="checkbox-item">
+        <div class="checkbox"></div>
+        <span>WebSocket 실시간 상태 업데이트 연결</span>
+      </div>
+      <div class="checkbox-item">
+        <div class="checkbox"></div>
+        <span>QA Part 테스트 시나리오 승인 후 실행</span>
+      </div>
+      <div class="checkbox-item">
+        <div class="checkbox"></div>
+        <span>E2E 테스트 timeout 이슈 디버깅 <strong style="color:#DC2626;">(긴급)</strong></span>
+      </div>
+
+      <h2>완료</h2>
+      <div class="checkbox-item">
+        <div class="checkbox checked"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <span class="strikethrough">프로젝트 초기 셋업 (Next.js + Drizzle)</span>
+      </div>
+      <div class="checkbox-item">
+        <div class="checkbox checked"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <span class="strikethrough">인증 시스템 (JWT + 로그인/셋업)</span>
+      </div>
+      <div class="checkbox-item">
+        <div class="checkbox checked"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <span class="strikethrough">에이전트 CRUD API</span>
+      </div>
+    `
+  },
+  'parts': {
+    title: '파트 구성 현황',
+    path: '.orchestrator/parts.md',
+    agent: 'Main',
+    modified: '09:30',
+    tags: ['설정'],
+    body: `
+      <h2>Part 구성</h2>
+
+      <h3>Dev Part <span style="display:inline-block;width:8px;height:8px;border-radius:3px;background:#6366F1;margin-left:4px;"></span></h3>
+      <ul>
+        <li><strong>Skill:</strong> developer v1.0</li>
+        <li><strong>Model:</strong> claude-opus-4</li>
+        <li><strong>Sub:</strong>
+          <ul>
+            <li>Frontend — UI 컴포넌트, 페이지 구현</li>
+            <li>Backend — API 라우트, DB 스키마</li>
+          </ul>
+        </li>
+      </ul>
+
+      <h3>Design Part <span style="display:inline-block;width:8px;height:8px;border-radius:3px;background:#E8606D;margin-left:4px;"></span></h3>
+      <ul>
+        <li><strong>Skill:</strong> planner v1.0</li>
+        <li><strong>Model:</strong> claude-sonnet-4</li>
+        <li><strong>Sub:</strong>
+          <ul>
+            <li>Research — 리서치 완료, 대기 중</li>
+          </ul>
+        </li>
+      </ul>
+
+      <h3>QA Part <span style="display:inline-block;width:8px;height:8px;border-radius:3px;background:#34D399;margin-left:4px;"></span></h3>
+      <ul>
+        <li><strong>Skill:</strong> tester v1.0</li>
+        <li><strong>Model:</strong> claude-sonnet-4</li>
+        <li><strong>Sub:</strong>
+          <ul>
+            <li>Integration Test — 승인 대기</li>
+          </ul>
+        </li>
+      </ul>
+    `
+  },
+  'errors': {
+    title: '오류 대응 기록',
+    path: '.orchestrator/errors.md',
+    agent: 'Main',
+    modified: '14:05',
+    tags: ['오류'],
+    body: `
+      <h2>오류 로그</h2>
+
+      <h3>[14:02] E2E 테스트 Timeout</h3>
+      <ul>
+        <li><strong>에이전트:</strong> QA Part > Integration Test</li>
+        <li><strong>에러:</strong> <code>TimeoutError: waiting for selector "form" — 30000ms exceeded</code></li>
+        <li><strong>원인 분석:</strong> dev 서버 미시작 또는 포트 3000 충돌 가능성</li>
+        <li><strong>조치:</strong> 포트 3000 정리 후 재시작 지시 (대표 승인 완료)</li>
+        <li><strong>상태:</strong> 해결 대기 중</li>
+      </ul>
+
+      <h3>[09:15] Drizzle Migration 경고</h3>
+      <ul>
+        <li><strong>에이전트:</strong> Dev Part > Backend</li>
+        <li><strong>에러:</strong> <code>Warning: No migration files found</code></li>
+        <li><strong>원인:</strong> drizzle-kit generate 미실행</li>
+        <li><strong>조치:</strong> migration 파일 생성 후 정상 동작 확인</li>
+        <li><strong>상태:</strong> ✅ 해결됨</li>
+      </ul>
+    `
+  },
+  'dev-progress': {
+    title: 'Dev Part 진행 현황',
+    path: '.dev-part/progress.md',
+    agent: 'Dev Part',
+    modified: '13:45',
+    tags: ['현황'],
+    body: `
+      <h2>Dev Part 작업 현황</h2>
+
+      <h3>Frontend Sub</h3>
+      <ul>
+        <li>대시보드 4컬럼 레이아웃 — 진행 중 (70%)</li>
+        <li>Resources 페이지 — 완료</li>
+        <li>Settings 페이지 — 완료</li>
+        <li>팝업 컴포넌트 5종 — 완료</li>
+      </ul>
+
+      <h3>Backend Sub</h3>
+      <ul>
+        <li>인증 API (login/setup/refresh) — ✅ 완료</li>
+        <li>에이전트 CRUD API — ✅ 완료</li>
+        <li>승인 API — ✅ 완료</li>
+        <li>WebSocket 실시간 업데이트 — 대기</li>
+      </ul>
+
+      <pre>전체 진행률: ████████░░ 60%</pre>
+    `
+  },
+  'fe-components': {
+    title: '프론트엔드 컴포넌트 목록',
+    path: '.dev-part/frontend/components.md',
+    agent: 'Frontend',
+    modified: '11:30',
+    tags: ['설정'],
+    body: `
+      <h2>컴포넌트 구조</h2>
+      <pre>src/components/
+├── workspace/
+│   ├── ColumnPanel.tsx
+│   ├── MainColumn.tsx
+│   ├── PartColumn.tsx
+│   ├── SubColumn.tsx
+│   ├── InstanceColumn.tsx
+│   ├── TaskCard.tsx
+│   ├── AgentCard.tsx
+│   ├── ConnectionLine.tsx
+│   └── FlowLayout.tsx
+├── layout/
+│   ├── TopNav.tsx
+│   └── ContentCard.tsx
+└── shared/
+    ├── StatusBadge.tsx
+    ├── DonutChart.tsx
+    └── DataTable.tsx</pre>
+
+      <h3>디자인 토큰</h3>
+      <ul>
+        <li>Page BG: <code>#E8ECEF</code></li>
+        <li>Content Card: <code>#F3F5F7</code>, border-radius 20px</li>
+        <li>Dark elements: <code>#10141A</code></li>
+        <li>Accent: <code>#7C5CFC</code></li>
+      </ul>
+    `
+  },
+  'fe-routing': {
+    title: '프론트엔드 라우팅',
+    path: '.dev-part/frontend/routing.md',
+    agent: 'Frontend',
+    modified: '10:00',
+    tags: ['설정'],
+    body: `
+      <h2>Next.js App Router 구조</h2>
+      <pre>src/app/
+├── (authenticated)/
+│   ├── layout.tsx          ← TopNav 포함
+│   ├── workspace/page.tsx  ← 대시보드 (메인)
+│   ├── resources/
+│   │   └── page.tsx        ← 리소스 (5개 서브탭)
+│   └── settings/
+│       └── page.tsx        ← 설정 (5개 서브탭)
+├── api/                    ← API 라우트
+└── page.tsx                ← 로그인 리다이렉트</pre>
+
+      <h3>인증 플로우</h3>
+      <ul>
+        <li>미인증 → <code>/login</code></li>
+        <li>최초 접속 → <code>/setup</code> (비밀번호 설정)</li>
+        <li>인증 완료 → <code>/workspace</code></li>
+      </ul>
+    `
+  },
+  'be-api': {
+    title: 'API 명세',
+    path: '.dev-part/backend/api-spec.md',
+    agent: 'Backend',
+    modified: '11:00',
+    tags: ['설정'],
+    body: `
+      <h2>REST API Endpoints</h2>
+
+      <h3>Auth</h3>
+      <ul>
+        <li><code>POST /api/auth/setup</code> — 초기 비밀번호 설정</li>
+        <li><code>POST /api/auth/login</code> — 로그인 (JWT 발급)</li>
+        <li><code>POST /api/auth/refresh</code> — 토큰 갱신</li>
+      </ul>
+
+      <h3>Agents</h3>
+      <ul>
+        <li><code>GET /api/agents/tree</code> — 전체 에이전트 트리</li>
+        <li><code>GET /api/agents/:id</code> — 에이전트 상세</li>
+        <li><code>POST /api/agents/:id/notes</code> — 노트 추가</li>
+      </ul>
+
+      <h3>Approvals</h3>
+      <ul>
+        <li><code>GET /api/approvals/pending</code> — 대기 중 승인 목록</li>
+        <li><code>POST /api/approvals/:id/approve</code> — 승인</li>
+        <li><code>POST /api/approvals/:id/reject</code> — 거부</li>
+      </ul>
+
+      <blockquote>모든 API는 JWT Bearer 토큰 필요 (auth 제외)</blockquote>
+    `
+  },
+  'design-research': {
+    title: '디자인 리서치 결과',
+    path: '.design-part/research.md',
+    agent: 'Design Part',
+    modified: '09:00',
+    tags: ['보고'],
+    body: `
+      <h2>UI 레퍼런스 리서치</h2>
+
+      <h3>SugarCRM Customer Journey</h3>
+      <ul>
+        <li>4단계 파이프라인 뷰 — 에이전트 계층과 유사</li>
+        <li>각 단계별 카드 + 컬러 코딩</li>
+        <li>필터링: 단계 클릭 시 하위 항목 필터</li>
+      </ul>
+
+      <h3>Obsidian</h3>
+      <ul>
+        <li>폴더 트리 기반 노트 네비게이션</li>
+        <li>마크다운 렌더링</li>
+        <li>백링크, 태그 시스템</li>
+      </ul>
+
+      <h3>채택 결정</h3>
+      <p>대시보드는 SugarCRM 스타일, 노트 탭은 Obsidian 스타일로 결합.
+      TopNav는 SugarCRM의 pill-tab 방식 적용.</p>
+    `
+  },
+  'qa-plan': {
+    title: '테스트 계획서',
+    path: '.qa-part/test-plan.md',
+    agent: 'QA Part',
+    modified: '10:30',
+    tags: ['할일'],
+    body: `
+      <h2>테스트 계획</h2>
+
+      <h3>단위 테스트 (Unit)</h3>
+      <ul>
+        <li>API 라우트 핸들러: 15개</li>
+        <li>Zustand Store: 14개</li>
+        <li>유틸 함수: 8개</li>
+      </ul>
+
+      <h3>시나리오 테스트 (Scenario)</h3>
+      <ul>
+        <li>로그인 → 대시보드 진입: 3건</li>
+        <li>에이전트 생성 → 태스크 할당: 5건</li>
+        <li>승인 플로우: 4건</li>
+      </ul>
+
+      <h3>통합 테스트 (Integration)</h3>
+      <ul>
+        <li>E2E 시나리오: 10건 <strong style="color:#DC2626;">(승인 대기)</strong></li>
+      </ul>
+
+      <blockquote>E2E 테스트는 Playwright 사용. dev 서버 자동 시작 설정 필요.</blockquote>
+
+      <div class="checkbox-item">
+        <div class="checkbox checked"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <span class="strikethrough">단위 테스트 계획 수립</span>
+      </div>
+      <div class="checkbox-item">
+        <div class="checkbox checked"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <span class="strikethrough">시나리오 테스트 계획 수립</span>
+      </div>
+      <div class="checkbox-item">
+        <div class="checkbox"></div>
+        <span>통합 테스트 승인 대기</span>
+      </div>
+    `
+  }
+};
+
+// ── Tag color map ──
+const tagColors = {
+  '현황': 'status', '보고': 'report', '결정': 'decision',
+  '설정': 'config', '할일': 'todo', '오류': ''
+};
+
+// ── State ──
+let currentView = 'list'; // 'list' or 'note'
+let currentNoteId = null;
+
+// ── Toggle folder expand/collapse ──
+function toggleFolder(btn) {
+  const arrow = btn.querySelector('.tree-arrow');
+  const agent = btn.dataset.agent;
+  const children = document.querySelector(`.tree-children[data-parent="${agent}"]`);
+  if (arrow) arrow.classList.toggle('open');
+  if (children) children.classList.toggle('collapsed');
+}
+
+// ── Select agent folder → show note list ──
+function selectAgent(agentId) {
+  // Clear file selections
+  document.querySelectorAll('.tree-file').forEach(f => f.classList.remove('active'));
+  // Clear agent selections then set active
+  document.querySelectorAll('.tree-item').forEach(i => i.classList.remove('active'));
+  const btn = document.querySelector(`.tree-item[data-agent="${agentId}"]`);
+  if (btn) btn.classList.add('active');
+
+  // Show list view
+  showListView();
+}
+
+// ── Open a specific note ──
+function openNote(noteId, treeBtn) {
+  const note = noteData[noteId];
+  if (!note) return;
+
+  // Update tree selection
+  document.querySelectorAll('.tree-file, .tree-item').forEach(el => el.classList.remove('active'));
+  if (treeBtn) {
+    treeBtn.classList.add('active');
+  } else {
+    const fileBtn = document.querySelector(`.tree-file[data-note="${noteId}"]`);
+    if (fileBtn) fileBtn.classList.add('active');
+  }
+
+  // Hide list, show viewer
+  document.getElementById('noteListView').classList.add('hidden');
+  const viewer = document.getElementById('noteViewer');
+  viewer.classList.add('active');
+
+  // Breadcrumb
+  const bc = document.getElementById('noteBreadcrumb');
+  bc.innerHTML = `<a onclick="showListView()">All Notes</a><span class="sep">/</span><a onclick="showListView()">${note.agent}</a><span class="sep">/</span><span>${note.path.split('/').pop()}</span>`;
+
+  // Title
+  document.getElementById('noteViewerTitle').textContent = note.title;
+
+  // Meta
+  document.getElementById('noteViewerMeta').innerHTML = `
+    <span class="note-viewer-meta-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      ${note.modified}
+    </span>
+    <span class="note-viewer-meta-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      ${note.agent}
+    </span>
+    <span class="note-viewer-meta-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <code style="font-family:'JetBrains Mono',monospace;font-size:10px;">${note.path}</code>
+    </span>
+  `;
+
+  // Tags
+  const tagsEl = document.getElementById('noteViewerTags');
+  tagsEl.innerHTML = (note.tags || []).map(t => {
+    const cls = tagColors[t] || '';
+    if (t === '오류') return `<span class="note-tag" style="background:#FEE2E2;color:#991B1B;">${t}</span>`;
+    return `<span class="note-tag ${cls}">${t}</span>`;
+  }).join('');
+
+  // Body
+  document.getElementById('noteViewerBody').innerHTML = note.body;
+
+  currentView = 'note';
+  currentNoteId = noteId;
+}
+
+// ── Open note in new browser tab ──
+function openInNewTab() {
+  if (!currentNoteId) return;
+  // In real app: window.open(`/workspace/notes/${currentNoteId}`)
+  // For prototype: open page-note-view.html with query param
+  window.open(`page-note-view.html?note=${currentNoteId}`, '_blank');
+}
+
+// ── Show list view (back from note) ──
+function showListView() {
+  document.getElementById('noteViewer').classList.remove('active');
+  document.getElementById('noteListView').classList.remove('hidden');
+  document.querySelectorAll('.tree-file').forEach(f => f.classList.remove('active'));
+  currentView = 'list';
+}
+</script>
+
+</body>
+</html>

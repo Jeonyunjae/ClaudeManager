@@ -6,6 +6,13 @@ import apiClient from '@/lib/api';
 
 type ActiveTab = 'info' | 'cli' | 'chat' | 'log' | 'note';
 
+/** 채팅 메시지에 딸린 부가 정보 (도구 사용·대기·취소 표시) */
+export type ChatMeta = {
+  tools?: { name: string; target?: string }[];
+  queued?: boolean;
+  cancelled?: boolean;
+};
+
 export type CLILogEntry = {
   timestamp: string;
   command: string;
@@ -64,6 +71,13 @@ type AgentDetailState = {
   isSending: boolean;
   sendingAgents: Set<string>;
   isAgentSending: (agentId: string) => boolean;
+  /** 에이전트별 대기 중인 질문 수 (서버 대기열을 WS로 받아 반영) */
+  queueDepths: Record<string, number>;
+  queueDepth: (agentId: string) => number;
+  setQueueDepth: (agentId: string, depth: number) => void;
+  markQueued: (messageId: string, queued: boolean) => void;
+  markCancelled: (messageId: string) => void;
+  cancelQueued: (agentId: string, messageId: string) => Promise<void>;
   openAgent: (agentId: string) => Promise<void>;
   closeAgent: () => void;
   setActiveTab: (tab: ActiveTab) => void;
@@ -77,6 +91,7 @@ type AgentDetailState = {
   cancelChat: (agentId: string) => Promise<void>;
   receiveWsMessage: (message: { id: string; sender: string; content: string; messageType: string; agentId: string }) => void;
   receiveWsStream: (data: { agentId: string; responseMsgId: string; content: string }) => void;
+  receiveWsTool: (data: { agentId: string; responseMsgId: string; name: string; target?: string }) => void;
   receiveWsTyping: (data: { agentId: string; isTyping: boolean }) => void;
   addConversation: (conv: AgentConversation) => void;
   updateNote: (file: string, content: string) => void;
@@ -105,9 +120,40 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
   isLoading: false,
   isSending: false,
   sendingAgents: new Set<string>(),
+  queueDepths: {},
 
   isAgentSending: (agentId: string) => {
     return get().sendingAgents.has(agentId);
+  },
+
+  queueDepth: (agentId: string) => get().queueDepths[agentId] ?? 0,
+
+  setQueueDepth: (agentId, depth) =>
+    set((state) => ({ queueDepths: { ...state.queueDepths, [agentId]: depth } })),
+
+  markQueued: (messageId, queued) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === messageId ? { ...c, metadata: { ...(c.metadata ?? {}), queued } } : c
+      ),
+    })),
+
+  markCancelled: (messageId) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === messageId
+          ? { ...c, metadata: { ...(c.metadata ?? {}), queued: false, cancelled: true } }
+          : c
+      ),
+    })),
+
+  cancelQueued: async (agentId, messageId) => {
+    try {
+      await apiClient.del(`/api/agents/${agentId}/queued?messageId=${encodeURIComponent(messageId)}`);
+      get().markCancelled(messageId);
+    } catch {
+      // 이미 실행이 시작됐으면 취소되지 않는다 — 표시도 바꾸지 않는다
+    }
   },
 
   openAgent: async (agentId) => {
@@ -244,7 +290,8 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
   },
 
   sendMessage: async (agentId, content, attachments) => {
-    if (!content.trim() || get().sendingAgents.has(agentId)) return;
+    // 답변 중이어도 막지 않는다. 서버 대기열이 순서를 지켜 처리한다.
+    if (!content.trim()) return;
     const newSending = new Set(get().sendingAgents);
     newSending.add(agentId);
     set({ isSending: true, sendingAgents: newSending });
@@ -374,6 +421,43 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
       };
       set({ conversations: [...state.conversations, streamMsg] });
     }
+  },
+
+  /**
+   * 에이전트가 도구를 실행할 때마다 도착. 스트리밍 말풍선에 누적 표시한다.
+   * 응답이 확정되면 서버가 metadata.tools 로 다시 내려주므로 새로고침해도 남는다.
+   */
+  receiveWsTool: (data) => {
+    const selected = get().selectedAgent;
+    if (selected && data.agentId !== selected.id) return;
+
+    const state = get();
+    const streamId = `stream-${data.responseMsgId}`;
+    const entry = { name: data.name, target: data.target };
+    const existing = state.conversations.find((c) => c.id === streamId);
+
+    if (existing) {
+      set({
+        conversations: state.conversations.map((c) =>
+          c.id === streamId
+            ? { ...c, metadata: { ...(c.metadata ?? {}), tools: [...(c.metadata?.tools ?? []), entry] } }
+            : c
+        ),
+      });
+      return;
+    }
+
+    // 아직 본문이 한 글자도 안 왔을 때도 도구는 보여야 한다
+    const placeholder: AgentConversation = {
+      id: streamId,
+      timestamp: new Date().toISOString(),
+      fromAgent: '...',
+      toAgent: 'user',
+      content: '',
+      type: 'report',
+      metadata: { tools: [entry] },
+    };
+    set({ conversations: [...state.conversations, placeholder] });
   },
 
   /**

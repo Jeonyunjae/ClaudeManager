@@ -46,6 +46,12 @@ export type AgentConversation = {
   toAgent: string;
   content: string;
   type: 'instruction' | 'report' | 'question' | 'approval';
+  /** 도구 사용 목록·대기·취소 표시 */
+  metadata?: {
+    tools?: { name: string; target?: string }[];
+    queued?: boolean;
+    cancelled?: boolean;
+  };
 };
 
 export type AgentNote = {

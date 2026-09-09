@@ -122,6 +122,7 @@ export async function POST(
     systemPrompt,
     responseMsgId,
     userId: String(userId),
+    userMsgId,
   });
 
   // Immediately respond — no blocking

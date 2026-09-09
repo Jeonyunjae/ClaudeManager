@@ -4,8 +4,8 @@
  * Run with: tsx src/server/start-ws.ts
  */
 
-import { createWSServer, onClientEvent, broadcast, sendToSocket, setCliExecuteHandler, setCliCancelHandler } from './ws-server';
-import { processChatInBackground } from './cli-executor';
+import { createWSServer, onClientEvent, broadcast, sendToSocket, setCliExecuteHandler, setCliCancelHandler, setQueueCancelHandler } from './ws-server';
+import { processChatInBackground, enqueueChat, cancelQueued } from './cli-executor';
 import { agentManager } from '../lib/agent-manager';
 import {
   connectTerminal,
@@ -117,7 +117,8 @@ onClientEvent('chat:send', async (_ws, payload) => {
 // Wire CLI executor to WS server
 // ---------------------------------------------------------------------------
 
-setCliExecuteHandler(processChatInBackground);
+setCliExecuteHandler(enqueueChat);
+setQueueCancelHandler(cancelQueued);
 setCliCancelHandler((agentId: string) => agentManager.cancelProcess(agentId));
 
 // ---------------------------------------------------------------------------

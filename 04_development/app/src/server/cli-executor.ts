@@ -29,6 +29,143 @@ export interface CliExecutionRequest {
   systemPrompt: string;
   responseMsgId: string;
   userId: string;
+  /** 사용자 메시지 id — 대기 중 취소 시 이 id로 지목한다. */
+  userMsgId?: string;
+}
+
+/**
+ * 도구 입력에서 한 줄로 보여줄 대상만 뽑는다.
+ * Read/Write → 파일 경로, Bash → 명령어, Grep → 패턴 …
+ */
+function summarizeToolInput(input: unknown): string | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  const o = input as Record<string, unknown>;
+  const pick = (k: string) => (typeof o[k] === 'string' ? (o[k] as string) : undefined);
+  const v =
+    pick('file_path') ??
+    pick('path') ??
+    pick('command') ??
+    pick('pattern') ??
+    pick('query') ??
+    pick('url') ??
+    pick('description') ??
+    pick('prompt');
+  if (!v) return undefined;
+  const oneLine = v.replace(/\s+/g, ' ').trim();
+  return oneLine.length > 90 ? oneLine.slice(0, 90) + '…' : oneLine;
+}
+
+/* ------------------------------------------------------------------ */
+/*  에이전트별 질문 대기열                                              */
+/*                                                                     */
+/*  에이전트 하나에 CLI 프로세스 하나만 붙을 수 있다. 같은 세션 id로     */
+/*  두 프로세스를 띄우면 대화 이력이 서로를 덮어써 세션이 깨진다.        */
+/*  그래서 답변 중에 들어온 질문은 여기 쌓아두고 순서대로 처리한다.      */
+/*  (클라이언트가 아니라 서버에 두는 이유: 새로고침·다중 탭에도 유지)    */
+/* ------------------------------------------------------------------ */
+
+const queues = new Map<string, CliExecutionRequest[]>();
+const running = new Set<string>();
+/** 대기 중 취소된 사용자 메시지 id */
+const cancelled = new Set<string>();
+
+export function getQueueDepth(agentId: string): number {
+  return queues.get(agentId)?.length ?? 0;
+}
+
+export function isAgentRunning(agentId: string): boolean {
+  return running.has(agentId);
+}
+
+/** 대기 중인 질문 취소. 메시지는 남기고 "취소됨"으로 표시한다. */
+export async function cancelQueued(agentId: string, userMsgId: string): Promise<boolean> {
+  const q = queues.get(agentId);
+  if (!q) return false;
+  const idx = q.findIndex((r) => r.userMsgId === userMsgId);
+  if (idx === -1) return false;
+
+  q.splice(idx, 1);
+  cancelled.add(userMsgId);
+
+  try {
+    await db
+      .update(chatMessages)
+      .set({ metadata: JSON.stringify({ agentId, queued: false, cancelled: true }) })
+      .where(eq(chatMessages.id, userMsgId));
+  } catch {
+    /* 표시 실패해도 큐에서는 빠진다 */
+  }
+
+  broadcast('chat:queue', {
+    agentId,
+    depth: q.length,
+    cancelledMsgId: userMsgId,
+  });
+  return true;
+}
+
+/**
+ * 채팅 처리 진입점. 이미 실행 중이면 대기열에 넣고 즉시 돌아온다.
+ */
+export async function enqueueChat(req: CliExecutionRequest): Promise<void> {
+  const { agentId } = req;
+
+  if (running.has(agentId)) {
+    const q = queues.get(agentId) ?? [];
+    q.push(req);
+    queues.set(agentId, q);
+    console.log(`[${ts()}] [CLI] ⏸ ${req.agentName} 대기열에 추가 (대기 ${q.length}건)`);
+    broadcast('chat:queue', { agentId, depth: q.length, queuedMsgId: req.userMsgId });
+    return;
+  }
+
+  running.add(agentId);
+  try {
+    await processChatInBackground(req);
+  } finally {
+    running.delete(agentId);
+    void drain(agentId);
+  }
+}
+
+/** 대기열에서 다음 질문을 꺼내 처리한다. 취소된 건은 건너뛴다. */
+async function drain(agentId: string): Promise<void> {
+  const q = queues.get(agentId);
+  if (!q || q.length === 0) return;
+
+  let next: CliExecutionRequest | undefined;
+  while (q.length > 0) {
+    const candidate = q.shift()!;
+    if (candidate.userMsgId && cancelled.has(candidate.userMsgId)) {
+      cancelled.delete(candidate.userMsgId);
+      continue;
+    }
+    next = candidate;
+    break;
+  }
+
+  broadcast('chat:queue', { agentId, depth: q.length });
+  if (!next) return;
+
+  // 대기 표시 해제
+  if (next.userMsgId) {
+    try {
+      await db
+        .update(chatMessages)
+        .set({ metadata: JSON.stringify({ agentId, queued: false }) })
+        .where(eq(chatMessages.id, next.userMsgId));
+    } catch {
+      /* noop */
+    }
+  }
+
+  running.add(agentId);
+  try {
+    await processChatInBackground(next);
+  } finally {
+    running.delete(agentId);
+    void drain(agentId);
+  }
 }
 
 /**
@@ -47,6 +184,10 @@ export async function processChatInBackground(req: CliExecutionRequest): Promise
 
   try {
     let streamedText = '';
+    // 에이전트가 실행한 도구들. 응답 메시지의 metadata에 함께 저장해
+    // 새로고침 후에도 "무엇을 했는지"가 남게 한다.
+    const toolsUsed: { name: string; target?: string }[] = [];
+
     const cliResponse = await agentManager.sendMessage(
       agentId,
       cliPrompt,
@@ -55,6 +196,11 @@ export async function processChatInBackground(req: CliExecutionRequest): Promise
       (chunk: string) => {
         streamedText += chunk;
         broadcast('chat:stream', { agentId, responseMsgId, content: streamedText });
+      },
+      (tool) => {
+        const entry = { name: tool.name || 'tool', target: summarizeToolInput(tool.input) };
+        toolsUsed.push(entry);
+        broadcast('chat:tool', { agentId, responseMsgId, ...entry });
       },
     );
 
@@ -77,13 +223,13 @@ export async function processChatInBackground(req: CliExecutionRequest): Promise
       });
     }
 
-    // Save agent response
+    // Save agent response (실행한 도구 목록을 함께 남긴다)
     await db.insert(chatMessages).values({
       id: responseMsgId,
       sender: agentName,
       content: responseText,
       messageType: 'text',
-      metadata: JSON.stringify({ agentId }),
+      metadata: JSON.stringify({ agentId, tools: toolsUsed }),
     });
 
     console.log(`[${ts()}] [CLI] ✔ ${agentName} — ${cliResponse.durationMs}ms, $${cliResponse.costUsd.toFixed(4)}, in:${cliResponse.inputTokens} out:${cliResponse.outputTokens}`);

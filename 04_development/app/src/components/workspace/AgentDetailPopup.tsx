@@ -476,12 +476,55 @@ function CLITab() {
 /* ═══════════════════════════════════════════════
    CHAT TAB
    ═══════════════════════════════════════════════ */
+/**
+ * 에이전트가 실행한 도구 목록.
+ *
+ * 없으면 응답이 나올 때까지 20초간 화면이 비어 있어 "멈춘 건가" 싶어진다.
+ * 무엇을 읽고 무엇을 고쳤는지 한 줄씩 보여준다.
+ */
+function ToolTrace({ tools }: { tools: { name: string; target?: string }[] }) {
+  if (tools.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 6 }}>
+      {tools.map((t, i) => (
+        <div
+          key={`${t.name}-${i}`}
+          style={{
+            display: 'flex', alignItems: 'baseline', gap: 8,
+            fontSize: '10.5px', color: T.textTertiary,
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            padding: '1px 2px',
+          }}
+        >
+          <span style={{ color: T.accentPurple, flexShrink: 0 }}>▸</span>
+          <span style={{ fontWeight: 600, flexShrink: 0, minWidth: 52 }}>{t.name}</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {t.target ?? ''}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ChatTab() {
   const { conversations, selectedAgent, sendMessage, cancelChat, isAgentSending, hasMoreConversations, isLoadingMore, loadMoreConversations } = useAgentDetailStore();
   const isSending = selectedAgent ? isAgentSending(selectedAgent.id) : false;
   const [inputValue, setInputValue] = useState('');
+  const [inputFocused, setInputFocused] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<{ filename: string; path: string; type: string; preview?: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  // 답변 중에 들어온 질문 수. 서버 대기열이 진실이고 WS로 받아 표시만 한다.
+  const { queueDepth: queueDepthOf, cancelQueued: cancelQueuedInStore } = useAgentDetailStore();
+  const queueDepth = selectedAgent ? queueDepthOf(selectedAgent.id) : 0;
+
+  const cancelQueuedMessage = useCallback(
+    (messageId: string) => {
+      if (!selectedAgent) return;
+      void cancelQueuedInStore(selectedAgent.id, messageId);
+    },
+    [selectedAgent, cancelQueuedInStore]
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -570,7 +613,8 @@ function ChatTab() {
   };
 
   const handleSend = () => {
-    if ((!inputValue.trim() && attachedFiles.length === 0) || !selectedAgent || isSending) return;
+    // 답변 중에도 보낼 수 있다 — 서버 대기열이 순서를 지켜 처리한다.
+    if ((!inputValue.trim() && attachedFiles.length === 0) || !selectedAgent) return;
     const msg = inputValue.trim() || (attachedFiles.length > 0 ? '첨부 파일을 분석해주세요.' : '');
     sendMessage(selectedAgent.id, msg, attachedFiles.length > 0 ? attachedFiles : undefined);
     setInputValue('');
@@ -717,41 +761,58 @@ function ChatTab() {
               );
             }
 
+            /*
+             * Wave AI 패널 구조를 따른다:
+             *   에이전트 답변 = 말풍선 없이 평문 (길고 마크다운·코드가 많아
+             *                   말풍선에 가두면 답답하다)
+             *   사용자 질문   = 오른쪽 정렬 말풍선
+             *   발신자 라벨   = 없음 (정렬과 배경으로 구분)
+             * 색은 Wave의 zinc 다크가 아니라 우리 토큰을 쓴다.
+             */
+            const meta = c.metadata as { tools?: { name: string; target?: string }[]; queued?: boolean; cancelled?: boolean } | undefined;
+            const tools = meta?.tools ?? [];
+
+            if (isUser) {
+              const queued = meta?.queued;
+              const cancelledMsg = meta?.cancelled;
+              return (
+                <div key={c.id} style={{ alignSelf: 'flex-end', maxWidth: 'calc(100% - 50px)', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <div style={{
+                    padding: '8px 12px', fontSize: '12px', lineHeight: 1.6,
+                    borderRadius: '10px', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    background: cancelledMsg ? 'transparent' : T.accentPurple,
+                    color: cancelledMsg ? T.textTertiary : 'white',
+                    border: cancelledMsg ? `1px dashed ${T.borderLight}` : 'none',
+                    textDecoration: cancelledMsg ? 'line-through' : 'none',
+                    opacity: queued ? 0.55 : 1,
+                  }}>
+                    {c.content}
+                  </div>
+                  <div style={{ fontSize: '9px', marginTop: '3px', color: T.textTertiary, display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {cancelledMsg && <span>취소됨</span>}
+                    {queued && !cancelledMsg && (
+                      <>
+                        <span>대기 중</span>
+                        <button
+                          onClick={() => cancelQueuedMessage(c.id)}
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', color: T.textTertiary, fontSize: '11px', padding: 0 }}
+                          title="대기 중인 질문 취소"
+                        >✕</button>
+                      </>
+                    )}
+                    {new Date(c.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              );
+            }
+
             return (
-              <div key={c.id} style={{
-                alignSelf: isUser ? 'flex-end' : 'flex-start',
-                maxWidth: '85%', display: 'flex', flexDirection: 'column',
-              }}>
-                <div style={{
-                  fontSize: '10px', fontWeight: 600, marginBottom: '3px',
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  color: isUser ? T.accentPurple : T.textSecondary,
-                  ...(isUser ? { textAlign: 'right' as const, justifyContent: 'flex-end' } : {}),
-                }}>
-                  {!isUser && (
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: T.accentPurple, display: 'inline-block' }} />
-                  )}
-                  {isUser ? '나' : c.fromAgent}
+              <div key={c.id} style={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column' }}>
+                {tools.length > 0 && <ToolTrace tools={tools} />}
+                <div className="chat-markdown" style={{ fontSize: '12px', lineHeight: 1.7, color: T.textPrimary, padding: '2px 2px 0' }}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{c.content}</ReactMarkdown>
                 </div>
-                <div style={{
-                  padding: '10px 14px', fontSize: '12px', lineHeight: 1.6,
-                  borderRadius: '14px',
-                  ...(isUser
-                    ? { background: T.accentPurple, color: 'white', borderBottomRightRadius: '4px' }
-                    : { background: '#F3F4F6', color: T.textPrimary, borderBottomLeftRadius: '4px' }),
-                }}
-                  className={!isUser ? 'chat-markdown' : undefined}
-                >
-                  {isUser ? c.content : (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{c.content}</ReactMarkdown>
-                  )}
-                </div>
-                <div style={{
-                  fontSize: '9px', marginTop: '3px',
-                  ...(isUser
-                    ? { textAlign: 'right' as const, color: 'rgba(124,92,252,0.5)' }
-                    : { color: T.textTertiary }),
-                }}>
+                <div style={{ fontSize: '9px', marginTop: '2px', color: T.textTertiary, padding: '0 2px' }}>
                   {new Date(c.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
@@ -759,22 +820,12 @@ function ChatTab() {
           })
         )}
 
-        {/* Typing indicator */}
+        {/* Typing indicator — 라벨·말풍선 없이 점만 (Wave 구조) */}
         {isSending && (
-          <div style={{ alignSelf: 'flex-start', maxWidth: '85%', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: '10px', fontWeight: 600, marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px', color: T.textSecondary }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: T.accentPurple, display: 'inline-block' }} />
-              {agentName}
-            </div>
-            <div style={{
-              padding: '12px 18px', borderRadius: '14px', borderBottomLeftRadius: '4px',
-              background: '#F3F4F6', display: 'flex', alignItems: 'center', gap: '4px',
-            }}>
-              <span style={{ fontSize: '11px', color: T.textTertiary, marginRight: '6px' }}>응답 대기 중</span>
-              <span className="typing-dot" style={{ width: '5px', height: '5px', borderRadius: '50%', background: T.accentPurple, animation: 'typingBounce 1.4s infinite ease-in-out', animationDelay: '0s' }} />
-              <span className="typing-dot" style={{ width: '5px', height: '5px', borderRadius: '50%', background: T.accentPurple, animation: 'typingBounce 1.4s infinite ease-in-out', animationDelay: '0.2s' }} />
-              <span className="typing-dot" style={{ width: '5px', height: '5px', borderRadius: '50%', background: T.accentPurple, animation: 'typingBounce 1.4s infinite ease-in-out', animationDelay: '0.4s' }} />
-            </div>
+          <div style={{ alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 2px' }}>
+            <span className="typing-dot" style={{ width: '5px', height: '5px', borderRadius: '50%', background: T.accentPurple, animation: 'typingBounce 1.4s infinite ease-in-out', animationDelay: '0s' }} />
+            <span className="typing-dot" style={{ width: '5px', height: '5px', borderRadius: '50%', background: T.accentPurple, animation: 'typingBounce 1.4s infinite ease-in-out', animationDelay: '0.2s' }} />
+            <span className="typing-dot" style={{ width: '5px', height: '5px', borderRadius: '50%', background: T.accentPurple, animation: 'typingBounce 1.4s infinite ease-in-out', animationDelay: '0.4s' }} />
           </div>
         )}
 
@@ -818,10 +869,11 @@ function ChatTab() {
         </div>
       )}
 
-      {/* Input Area */}
+      {/* Input Area — Wave 구조: 첨부·전송 버튼을 입력창 안에 겹쳐 배치 */}
       <div style={{
-        display: 'flex', alignItems: 'flex-end', gap: '8px',
-        padding: '12px 24px', borderTop: attachedFiles.length > 0 ? 'none' : `1px solid ${T.borderLight}`, background: T.bgCard,
+        padding: '10px 20px 12px',
+        borderTop: attachedFiles.length > 0 ? 'none' : `1px solid ${T.borderLight}`,
+        background: T.bgCard,
       }}>
         <input
           ref={fileInputRef}
@@ -831,81 +883,96 @@ function ChatTab() {
           onChange={handleFileSelect}
           accept=".txt,.md,.csv,.json,.xml,.yaml,.yml,.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.svg,.ts,.tsx,.js,.jsx,.py,.sh,.sql,.log,.toml,.ini,.cfg"
         />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading || isSending}
-          style={{
-            width: '32px', height: '32px', borderRadius: '8px', border: 'none',
-            background: attachedFiles.length > 0 ? 'rgba(124,92,252,0.1)' : 'transparent',
-            color: attachedFiles.length > 0 ? T.accentPurple : T.textTertiary,
-            cursor: 'pointer', flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: isUploading ? 0.5 : 1,
-          }}
-          title="파일 첨부"
-        >
-          {isUploading ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+
+        <div style={{
+          position: 'relative',
+          border: `1px solid ${inputFocused ? T.accentPurple : T.borderLight}`,
+          borderRadius: '12px',
+          background: T.bgCard,
+          boxShadow: inputFocused ? '0 0 0 3px rgba(124,92,252,0.10)' : 'none',
+          transition: 'border-color .15s, box-shadow .15s',
+        }}>
+          <textarea
+            value={inputValue}
+            onChange={(e) => {
+              setInputValue(e.target.value);
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 168) + 'px';
+            }}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
+            placeholder={
+              isSending
+                ? `${agentName}이(가) 작업 중 — 이어서 질문하면 순서대로 처리합니다`
+                : `${agentName}에게 지시하기…  (Shift+Enter 줄바꿈)`
+            }
+            rows={1}
+            style={{
+              width: '100%', padding: '10px 76px 10px 12px',
+              border: 'none', outline: 'none', background: 'transparent',
+              fontSize: '12px', fontFamily: 'inherit', lineHeight: 1.6,
+              resize: 'none', overflowY: 'auto', maxHeight: '168px',
+              color: T.textPrimary, borderRadius: '12px',
+            }}
+          />
+
+          {/* 첨부 */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            style={{
+              position: 'absolute', right: 42, bottom: 7,
+              width: '28px', height: '28px', borderRadius: '8px', border: 'none',
+              background: attachedFiles.length > 0 ? 'rgba(124,92,252,0.1)' : 'transparent',
+              color: attachedFiles.length > 0 ? T.accentPurple : T.textTertiary,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: isUploading ? 0.5 : 1,
+            }}
+            title="파일 첨부"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+
+          {/* 전송 / 중지 */}
+          {isSending ? (
+            <button
+              onClick={() => selectedAgent && cancelChat(selectedAgent.id)}
+              style={{
+                position: 'absolute', right: 8, bottom: 7,
+                width: '28px', height: '28px', borderRadius: '8px',
+                background: '#EF4444', color: 'white', border: 'none',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+              title="응답 중지"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+            </button>
           ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            <button
+              onClick={handleSend}
+              disabled={!inputValue.trim() && attachedFiles.length === 0}
+              style={{
+                position: 'absolute', right: 8, bottom: 7,
+                width: '28px', height: '28px', borderRadius: '8px',
+                background: (inputValue.trim() || attachedFiles.length > 0) ? T.accentPurple : 'transparent',
+                color: (inputValue.trim() || attachedFiles.length > 0) ? 'white' : T.textTertiary,
+                border: 'none',
+                cursor: (inputValue.trim() || attachedFiles.length > 0) ? 'pointer' : 'default',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+              title="전송 (Enter)"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
           )}
-        </button>
-        <textarea
-          value={inputValue}
-          onChange={(e) => {
-            setInputValue(e.target.value);
-            e.target.style.height = 'auto';
-            e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-          }}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          placeholder={isSending ? 'Waiting for response...' : `${agentName}에게 지시하기...`}
-          disabled={isSending}
-          rows={1}
-          style={{
-            flex: 1, padding: '10px 14px', borderRadius: '10px',
-            border: `1px solid ${T.borderLight}`, fontSize: '12px',
-            outline: 'none', fontFamily: 'inherit',
-            opacity: isSending ? 0.6 : 1,
-            resize: 'none', lineHeight: 1.5,
-            maxHeight: '120px', overflowY: 'auto',
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = T.accentPurple;
-            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(124,92,252,0.1)';
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = T.borderLight;
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-        />
-        {isSending ? (
-          <button
-            onClick={() => selectedAgent && cancelChat(selectedAgent.id)}
-            style={{
-              width: '36px', height: '36px', borderRadius: '50%',
-              background: '#EF4444', color: 'white', border: 'none',
-              cursor: 'pointer', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-            title="응답 중지"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
-          </button>
-        ) : (
-          <button
-            onClick={handleSend}
-            disabled={!inputValue.trim() && attachedFiles.length === 0}
-            style={{
-              width: '36px', height: '36px', borderRadius: '50%',
-              background: (!inputValue.trim() && attachedFiles.length === 0) ? '#D1D5DB' : T.accentPurple,
-              color: 'white', border: 'none',
-              cursor: 'pointer', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          </button>
+        </div>
+
+        {queueDepth > 0 && (
+          <div style={{ fontSize: '10px', color: T.textTertiary, marginTop: 6, paddingLeft: 2 }}>
+            대기 중인 질문 {queueDepth}건 — 앞의 답변이 끝나면 순서대로 처리됩니다
+          </div>
         )}
       </div>
     </div>

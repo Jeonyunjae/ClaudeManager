@@ -85,6 +85,9 @@ type CliExecuteHandler = (params: any) => Promise<void>;
 type CliCancelHandler = (agentId: string) => boolean;
 let cliExecuteHandler: CliExecuteHandler | null = null;
 let cliCancelHandler: CliCancelHandler | null = null;
+/** 대기 중인 질문 취소 (실행 중인 것은 cliCancelHandler 가 담당) */
+type QueueCancelHandler = (agentId: string, messageId: string) => Promise<boolean>;
+let queueCancelHandler: QueueCancelHandler | null = null;
 
 /**
  * Register the CLI execution handler (called from start-ws.ts).
@@ -96,6 +99,10 @@ export function setCliExecuteHandler(handler: CliExecuteHandler): void {
 /**
  * Register the CLI cancel handler (called from start-ws.ts).
  */
+export function setQueueCancelHandler(handler: QueueCancelHandler): void {
+  queueCancelHandler = handler;
+}
+
 export function setCliCancelHandler(handler: CliCancelHandler): void {
   cliCancelHandler = handler;
 }
@@ -190,6 +197,32 @@ export function createWSServer(port: number = WS_PORT): WebSocketServer {
           } else {
             console.error(`[${ts()}] [WS] CLI execute handler not registered`);
           }
+        } catch {
+          res.writeHead(400);
+          res.end('Bad Request');
+        }
+      });
+      return;
+    }
+
+    // 대기열 취소 — 아직 실행 전인 질문을 큐에서 뺀다
+    if (req.method === 'POST' && req.url === '/_queue-cancel') {
+      const secret = req.headers['x-ws-secret'];
+      if (secret !== BROADCAST_SECRET) {
+        res.writeHead(401);
+        res.end('Unauthorized');
+        return;
+      }
+      let qbody = '';
+      req.on('data', (chunk) => { qbody += chunk; });
+      req.on('end', async () => {
+        try {
+          const { agentId, messageId } = JSON.parse(qbody);
+          const cancelled = queueCancelHandler
+            ? await queueCancelHandler(agentId, messageId)
+            : false;
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, cancelled }));
         } catch {
           res.writeHead(400);
           res.end('Bad Request');

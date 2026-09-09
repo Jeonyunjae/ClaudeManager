@@ -16,6 +16,12 @@ function ts() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+/** 에이전트가 실행한 도구 한 건. 채팅에 "🔧 Read  파일명" 처럼 표시된다. */
+export interface ToolUseEvent {
+  name?: string;
+  input?: unknown;
+}
+
 export interface CLIResult {
   type: string;
   subtype?: string;
@@ -151,7 +157,7 @@ class AgentManager extends EventEmitter {
   /**
    * Send a message to an agent and get the response (streaming).
    */
-  async sendMessage(agentId: string, content: string, systemPrompt?: string, modelName?: string, onStream?: (text: string) => void): Promise<{ text: string; costUsd: number; inputTokens: number; outputTokens: number; durationMs: number; modelName: string }> {
+  async sendMessage(agentId: string, content: string, systemPrompt?: string, modelName?: string, onStream?: (text: string) => void, onToolUse?: (tool: ToolUseEvent) => void): Promise<{ text: string; costUsd: number; inputTokens: number; outputTokens: number; durationMs: number; modelName: string }> {
     let session = this.sessions.get(agentId);
     let projectRoot: string | undefined;
 
@@ -192,6 +198,7 @@ class AgentManager extends EventEmitter {
         projectRoot: session.projectRoot,
         model,
         onStream,
+        onToolUse,
       });
 
       session.sessionId = result.session_id;
@@ -250,6 +257,7 @@ class AgentManager extends EventEmitter {
     projectRoot?: string;
     model?: string;
     onStream?: (text: string) => void;
+    onToolUse?: (tool: ToolUseEvent) => void;
   }): Promise<CLIResult> {
     return new Promise((resolve, reject) => {
       const agentProjectRoot = options.projectRoot || process.env.PROJECT_ROOT || '';
@@ -328,12 +336,23 @@ class AgentManager extends EventEmitter {
               }
             } else if (event.type === 'assistant') {
               const blocks = event.message?.content;
-              if (options.onStream && Array.isArray(blocks)) {
-                const text = blocks
-                  .filter((b: { type?: string }) => b?.type === 'text')
-                  .map((b: { text?: string }) => b.text || '')
-                  .join('');
-                if (text) options.onStream(text);
+              if (Array.isArray(blocks)) {
+                if (options.onStream) {
+                  const text = blocks
+                    .filter((b: { type?: string }) => b?.type === 'text')
+                    .map((b: { text?: string }) => b.text || '')
+                    .join('');
+                  if (text) options.onStream(text);
+                }
+                // 에이전트가 어떤 도구를 실행했는지. 지금까지 버리고 있던 정보라
+                // 사용자는 20초 동안 무슨 일이 벌어지는지 알 수 없었다.
+                if (options.onToolUse) {
+                  for (const b of blocks) {
+                    if (b?.type === 'tool_use') {
+                      options.onToolUse({ name: b.name, input: b.input });
+                    }
+                  }
+                }
               }
             } else if (event.type === 'result') {
               lastResult = event as CLIResult;

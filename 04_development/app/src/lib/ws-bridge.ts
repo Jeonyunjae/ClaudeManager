@@ -12,6 +12,7 @@ import { WS_PORT } from './constants';
 const WS_BROADCAST_URL = `http://localhost:${WS_PORT}/_broadcast`;
 const WS_CLI_EXECUTE_URL = `http://localhost:${WS_PORT}/_cli-execute`;
 const WS_CLI_CANCEL_URL = `http://localhost:${WS_PORT}/_cli-cancel`;
+const WS_QUEUE_CANCEL_URL = `http://localhost:${WS_PORT}/_queue-cancel`;
 const BROADCAST_SECRET = process.env.WS_BROADCAST_SECRET || 'claudemanager-ws-internal';
 
 /**
@@ -25,6 +26,7 @@ export async function requestCliExecution(params: {
   systemPrompt: string;
   responseMsgId: string;
   userId: string;
+  userMsgId?: string;
 }): Promise<void> {
   try {
     await fetch(WS_CLI_EXECUTE_URL, {
@@ -134,4 +136,20 @@ export function broadcastCostUpdated(summary: {
 
 export function broadcastLogNew(agentId: string, entry: Record<string, unknown>): Promise<void> {
   return wsBroadcast('log:new', { agentId, entry });
+}
+
+/** 대기 중인 질문 취소를 WS 서버에 요청한다. */
+export async function cancelQueuedViaWs(agentId: string, messageId: string): Promise<boolean> {
+  try {
+    const res = await fetch(WS_QUEUE_CANCEL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-ws-secret': BROADCAST_SECRET },
+      body: JSON.stringify({ agentId, messageId }),
+    });
+    if (!res.ok) return false;
+    const j = (await res.json()) as { cancelled?: boolean };
+    return Boolean(j.cancelled);
+  } catch {
+    return false;
+  }
 }

@@ -7,8 +7,8 @@ export async function register() {
     const { v4: uuidv4 } = await import('uuid');
 
     // --- WS Server integration ---
-    const { createWSServer, onClientEvent, broadcast, sendToSocket, setCliExecuteHandler, setCliCancelHandler } = await import('@/server/ws-server');
-    const { processChatInBackground } = await import('@/server/cli-executor');
+    const { createWSServer, onClientEvent, broadcast, sendToSocket, setCliExecuteHandler, setCliCancelHandler, setQueueCancelHandler } = await import('@/server/ws-server');
+    const { processChatInBackground, enqueueChat, cancelQueued } = await import('@/server/cli-executor');
     const { connectTerminal, writeTerminal, resizeTerminal, disconnectTerminal, setOnDataHandler, setOnExitHandler } = await import('@/lib/terminal-manager');
     const { setWatcherBroadcast, startFileWatcher } = await import('@/lib/file-watcher');
     const { startBackupScheduler } = await import('@/lib/backup-scheduler');
@@ -69,7 +69,8 @@ export async function register() {
     });
 
     // Wire CLI executor
-    setCliExecuteHandler(processChatInBackground);
+    setCliExecuteHandler(enqueueChat);
+    setQueueCancelHandler(cancelQueued);
     setCliCancelHandler((agentId: string) => agentManager.cancelProcess(agentId));
 
     // Start WS server

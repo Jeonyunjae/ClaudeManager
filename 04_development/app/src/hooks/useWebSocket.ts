@@ -64,6 +64,30 @@ export function useWebSocket(): void {
       })
     );
 
+    // 에이전트가 실행한 도구 — 응답이 오기 전 진행 상황을 보여준다
+    unsubscribers.push(
+      wsClient.on('chat:tool', (payload) => {
+        const d = payload as { agentId: string; responseMsgId: string; name: string; target?: string };
+        useAgentDetailStore.getState().receiveWsTool(d);
+      })
+    );
+
+    // 서버 대기열 상태 — 대기 건수와 취소·대기 표시
+    unsubscribers.push(
+      wsClient.on('chat:queue', (payload) => {
+        const d = payload as {
+          agentId: string;
+          depth: number;
+          queuedMsgId?: string;
+          cancelledMsgId?: string;
+        };
+        const store = useAgentDetailStore.getState();
+        store.setQueueDepth(d.agentId, d.depth);
+        if (d.queuedMsgId) store.markQueued(d.queuedMsgId, true);
+        if (d.cancelledMsgId) store.markCancelled(d.cancelledMsgId);
+      })
+    );
+
     // Approval events
     unsubscribers.push(
       wsClient.on('approval:request', (payload) => {

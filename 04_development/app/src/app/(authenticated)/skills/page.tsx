@@ -161,7 +161,16 @@ export default function SkillsPage() {
     .filter((s) => (category === '전체' ? true : s.topics.includes(category)));
 
   return (
-    <div style={{ padding: 24 }}>
+    // Content Card — Dashboard/Resources/Settings 와 동일한 래퍼
+    <div
+      style={{
+        background: 'var(--bg-content-card)',
+        borderRadius: 20,
+        margin: '16px 20px',
+        padding: '20px 24px',
+        minHeight: 'calc(100vh - 56px - 68px)',
+      }}
+    >
       {/* ---------- 헤더 ---------- */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>

@@ -11,6 +11,26 @@ import { logError } from '@/lib/error-logger';
 // Disk usage — parse `df -k /` output (macOS / Linux)
 // ---------------------------------------------------------------------------
 
+/**
+ * 디스크 총량/사용량(바이트). 퍼센트만으로는 UI가 절대값을 표시할 수 없어
+ * 총량을 하드코딩(500GB)하고 있었으므로 실측값을 함께 내려준다.
+ */
+function getDiskBytes(): { total: number; used: number } {
+  try {
+    const target = process.platform === 'darwin' ? '/System/Volumes/Data' : '/';
+    const output = execSync(`df -k ${target}`, { encoding: 'utf-8', timeout: 3000 });
+    const lines = output.trim().split('\n');
+    if (lines.length < 2) return { total: 0, used: 0 };
+    const cols = lines[1].split(/\s+/);
+    const used = parseInt(cols[2], 10);
+    const available = parseInt(cols[3], 10);
+    if (isNaN(used) || isNaN(available)) return { total: 0, used: 0 };
+    return { total: (used + available) * 1024, used: used * 1024 };
+  } catch {
+    return { total: 0, used: 0 };
+  }
+}
+
 function getDiskPercent(): number {
   try {
     // macOS APFS: df / shows snapshot volume (tiny %), use /System/Volumes/Data for real usage
@@ -158,11 +178,21 @@ export async function GET(request: NextRequest) {
       status = 'warning';
     }
 
+    // 절대값(총량/사용량/코어 수) — UI가 임의 값을 지어내지 않도록 함께 내려준다.
+    const diskBytes = getDiskBytes();
+    const totalMemBytes = os.totalmem();
+
     return NextResponse.json({
       data: {
         cpu: Math.round(cpuPercent),
         memory: Math.round(memoryPercent),
         disk: Math.round(diskPercent),
+        cpuCores: os.cpus().length,
+        memoryTotalBytes: totalMemBytes,
+        memoryUsedBytes: Math.round((totalMemBytes * memoryPercent) / 100),
+        diskTotalBytes: diskBytes.total,
+        diskUsedBytes: diskBytes.used,
+        loadAvg1m: os.loadavg()[0],
         networkUp: network.up,
         networkInterfaceName: network.interfaceName,
         networkInputBytes: network.inputBytes,

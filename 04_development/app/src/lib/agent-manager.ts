@@ -254,14 +254,19 @@ class AgentManager extends EventEmitter {
     return new Promise((resolve, reject) => {
       const agentProjectRoot = options.projectRoot || process.env.PROJECT_ROOT || '';
       const model = options.model || 'sonnet';
-      const args = ['--print', '--verbose', '--output-format', 'stream-json', '--permission-mode', 'bypassPermissions', '--model', model];
+      // --include-partial-messages: 토큰 단위 delta를 받아 실시간 스트리밍한다.
+      // 없으면 assistant 블록이 완성된 뒤에야 도착해 체감 지연이 커진다.
+      const args = ['--print', '--verbose', '--output-format', 'stream-json', '--include-partial-messages', '--permission-mode', 'bypassPermissions', '--model', model];
 
       if (agentProjectRoot) {
         args.push('--add-dir', agentProjectRoot);
       }
 
       if (options.resumeSessionId) {
-        args.push('--continue', options.resumeSessionId);
+        // `--continue`는 인자를 받지 않는 불리언 플래그다. 여기에 세션 ID를 붙이면
+        // ID가 positional prompt 자리를 빼앗아 사용자 질문이 CLI에 전달되지 않는다.
+        // 세션 ID로 재개하는 플래그는 `--resume`이다.
+        args.push('--resume', options.resumeSessionId);
       } else if (options.systemPrompt) {
         args.push('--system-prompt', options.systemPrompt);
       }
@@ -312,9 +317,23 @@ class AgentManager extends EventEmitter {
           if (!trimmed) continue;
           try {
             const event = JSON.parse(trimmed);
-            if (event.type === 'assistant' && event.subtype === 'text') {
-              if (options.onStream && event.content) {
-                options.onStream(event.content);
+            // stream-json의 assistant 이벤트에는 subtype이 없고, 본문은
+            // event.message.content[] 안의 text 블록에 들어 있다.
+            // 기존 조건(event.subtype === 'text')은 절대 참이 되지 않아
+            // onStream이 한 번도 호출되지 않았다 → 스트리밍이 죽어 있었음.
+            if (event.type === 'stream_event' && event.event?.type === 'content_block_delta') {
+              const delta = event.event.delta;
+              if (options.onStream && delta?.type === 'text_delta' && delta.text) {
+                options.onStream(delta.text);
+              }
+            } else if (event.type === 'assistant') {
+              const blocks = event.message?.content;
+              if (options.onStream && Array.isArray(blocks)) {
+                const text = blocks
+                  .filter((b: { type?: string }) => b?.type === 'text')
+                  .map((b: { text?: string }) => b.text || '')
+                  .join('');
+                if (text) options.onStream(text);
               }
             } else if (event.type === 'result') {
               lastResult = event as CLIResult;

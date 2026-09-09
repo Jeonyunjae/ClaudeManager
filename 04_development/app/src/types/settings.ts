@@ -39,6 +39,13 @@ export type SystemHealth = {
   cpu: number;
   memory: number;
   disk: number;
+  /** 절대값 — 없으면 UI가 "—"를 표시한다 (임의 값을 지어내지 않는다). */
+  cpuCores?: number;
+  loadAvg1m?: number;
+  memoryTotalBytes?: number;
+  memoryUsedBytes?: number;
+  diskTotalBytes?: number;
+  diskUsedBytes?: number;
   networkUp: number;
   networkDown: number;
   activeAgents: number;

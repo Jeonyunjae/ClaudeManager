@@ -24,7 +24,8 @@ export async function POST(
   const sessionId = agent.cliSessionId;
   const projectRoot = agent.projectRoot || process.cwd();
 
-  const continueFlag = sessionId ? `--continue ${sessionId}` : '';
+  // `--continue`는 인자를 받지 않는다. 세션 ID로 재개하려면 `--resume`.
+  const continueFlag = sessionId ? `--resume ${sessionId}` : '';
   const cmd = `ulimit -n 2147483646; cd '${projectRoot.replace(/'/g, "'\\''")}' && claude ${continueFlag}`.trim();
 
   const script = `

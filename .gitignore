@@ -8,4 +8,4 @@ node_modules/
 .next/
 .claude/
 .rollback_backup/
-data/
+/04_development/app/data/

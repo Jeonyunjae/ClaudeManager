@@ -13,7 +13,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/workspace');
+      // /workspace는 폐기된 경로로 /dashboard 로 재리다이렉트만 한다.
+      // 한 단계 건너뛰어 곧바로 대시보드로 보낸다.
+      router.replace('/dashboard');
     }
   }, [isAuthenticated, router]);
 

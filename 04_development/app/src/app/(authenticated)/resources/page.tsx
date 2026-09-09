@@ -44,6 +44,13 @@ const ACTION_STYLE: Record<string, { background: string; color: string }> = {
 };
 const DEFAULT_ACTION_STYLE = { background: 'var(--bg-content-card)', color: 'var(--text-secondary)' };
 
+/** 바이트를 GB/TB로. 값이 없으면 "—" (총량을 지어내지 않는다). */
+function formatBytes(bytes?: number): string {
+  if (bytes == null || !isFinite(bytes) || bytes <= 0) return '—';
+  const gb = bytes / 1024 ** 3;
+  return gb >= 1024 ? `${(gb / 1024).toFixed(1)} TB` : `${gb.toFixed(1)} GB`;
+}
+
 const STATUS_STYLE: Record<ApprovalStatus, { label: string; style: { background: string; color: string } }> = {
   pending: { label: 'Pending', style: { background: 'var(--status-pending-bg)', color: 'var(--status-pending-text)' } },
   approved: { label: 'Approved', style: { background: 'var(--status-complete-bg)', color: 'var(--status-complete-text)' } },
@@ -217,9 +224,10 @@ export default function ResourcesPage() {
     fetchAudit(auditPage, auditFilter !== 'All' ? auditFilter : undefined, searchAudit || undefined);
   }, [auditPage, auditFilter, searchAudit, fetchAudit]);
 
-  const cpuPercent = health?.cpu ?? 52;
-  const memPercent = health?.memory ?? 96;
-  const diskPercent = health?.disk ?? 7;
+  // 데이터 로드 전 임의 수치(52/96/7)를 보여주면 실제 상태로 오인된다. 0으로 시작한다.
+  const cpuPercent = health?.cpu ?? 0;
+  const memPercent = health?.memory ?? 0;
+  const diskPercent = health?.disk ?? 0;
 
   const todayCost = summary?.todayCost ?? 0;
   const monthlyCost = summary?.monthlyCost ?? 0;
@@ -304,16 +312,16 @@ export default function ResourcesPage() {
       {activeTab === 'health' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
           <GaugeCard title="CPU" percent={cpuPercent} color="#F59E0B" details={[
-            { label: 'Cores', value: '4' },
-            { label: 'Load', value: (cpuPercent / 25).toFixed(2) },
+            { label: 'Cores', value: health?.cpuCores != null ? String(health.cpuCores) : '—' },
+            { label: 'Load', value: health?.loadAvg1m != null ? health.loadAvg1m.toFixed(2) : '—' },
           ]} />
           <GaugeCard title="Memory" percent={memPercent} color="#EF4444" details={[
-            { label: 'Total', value: '16 GB' },
-            { label: 'Used', value: `${(16 * memPercent / 100).toFixed(1)} GB`, warn: memPercent > 90 },
+            { label: 'Total', value: formatBytes(health?.memoryTotalBytes) },
+            { label: 'Used', value: formatBytes(health?.memoryUsedBytes), warn: memPercent > 90 },
           ]} />
           <GaugeCard title="Disk" percent={diskPercent} color="#34D399" details={[
-            { label: 'Total', value: '500 GB' },
-            { label: 'Used', value: `${Math.round(500 * diskPercent / 100)} GB` },
+            { label: 'Total', value: formatBytes(health?.diskTotalBytes) },
+            { label: 'Used', value: formatBytes(health?.diskUsedBytes) },
           ]} />
         </div>
       )}

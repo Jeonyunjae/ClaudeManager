@@ -10,6 +10,7 @@ import { formatRelativeTime } from '@/lib/utils';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/skills', label: 'Skills' },
   { href: '/resources', label: 'Resources' },
   { href: '/settings', label: 'Settings' },
 ];

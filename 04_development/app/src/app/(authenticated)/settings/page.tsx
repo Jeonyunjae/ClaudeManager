@@ -90,6 +90,9 @@ export default function SettingsPage() {
   const [notifications, setNotifications] = useState(true);
   const [alertThreshold, setAlertThreshold] = useState('80%');
   const [defaultModel, setDefaultModel] = useState('claude-opus-4');
+  const [skillsAccountUrl, setSkillsAccountUrl] = useState('');
+  const [githubToken, setGithubToken] = useState('');
+  const [githubTokenMasked, setGithubTokenMasked] = useState<string | null>(null);
 
   /* CLI Status */
   const [cliStatus, setCliStatus] = useState<{
@@ -120,6 +123,7 @@ export default function SettingsPage() {
       setMaxAgents(settings.maxConcurrentAgents);
       setRetryCount(settings.retryCount);
       setAlertThreshold(`${settings.alertThreshold}%`);
+      setSkillsAccountUrl(settings.skillsAccountUrl ?? '');
     }
   }, [settings]);
 
@@ -136,9 +140,24 @@ export default function SettingsPage() {
     }
   }, []);
 
+  /* 등록된 GitHub 토큰 표시용 */
+  const loadGithubKey = useCallback(async () => {
+    try {
+      const res = await apiClient.get<{ provider: string; keyMasked: string }[]>('/api/apikeys');
+      const gh = res.data.find((k) => k.provider === 'github');
+      setGithubTokenMasked(gh?.keyMasked ?? null);
+    } catch {
+      setGithubTokenMasked(null);
+    }
+  }, []);
+
   useEffect(() => {
     loadCliStatus();
   }, [loadCliStatus]);
+
+  useEffect(() => {
+    loadGithubKey();
+  }, [loadGithubKey]);
 
   /* Load parts */
   useEffect(() => {
@@ -167,11 +186,18 @@ export default function SettingsPage() {
         maxConcurrentAgents: maxAgents,
         retryCount,
         alertThreshold: parsedThreshold,
+        skillsAccountUrl: skillsAccountUrl.trim(),
       });
+      if (githubToken.trim()) {
+        await apiClient.post('/api/apikeys', { provider: 'github', key: githubToken.trim() });
+        setGithubToken('');
+        loadGithubKey();
+      }
     } finally {
       setIsSaving(false);
     }
   };
+
 
 
   /* Save part policy */
@@ -402,7 +428,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Default Model */}
-                <div style={settingRowLastStyle}>
+                <div style={settingRowStyle}>
                   <div style={{ flex: 1 }}>
                     <div style={settingLabelStyle}>Default Model</div>
                     <div style={settingHintStyle}>Default model for new agents</div>
@@ -417,6 +443,45 @@ export default function SettingsPage() {
                       <option value="claude-sonnet-4">claude-sonnet-4</option>
                       <option value="claude-haiku-4">claude-haiku-4</option>
                     </select>
+                  </div>
+                </div>
+
+                {/* Skills Account */}
+                <div style={settingRowStyle}>
+                  <div style={{ flex: 1 }}>
+                    <div style={settingLabelStyle}>Skills Account</div>
+                    <div style={settingHintStyle}>
+                      스킬을 보관하는 GitHub 계정 주소. 저장소 하나가 스킬 하나입니다.
+                    </div>
+                  </div>
+                  <div style={{ flexShrink: 0, marginLeft: 16 }}>
+                    <input
+                      style={{ ...settingInputStyle, width: 380, textAlign: 'left' }}
+                      value={skillsAccountUrl}
+                      placeholder="https://github.com/Jeonyunjae-Skills"
+                      onChange={(e) => setSkillsAccountUrl(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* GitHub Token */}
+                <div style={settingRowLastStyle}>
+                  <div style={{ flex: 1 }}>
+                    <div style={settingLabelStyle}>GitHub Token</div>
+                    <div style={settingHintStyle}>
+                      {githubTokenMasked
+                        ? `등록됨 (${githubTokenMasked}) — 새 값을 입력하면 교체됩니다`
+                        : 'private 저장소를 읽으려면 필요합니다. 암호화해 저장됩니다.'}
+                    </div>
+                  </div>
+                  <div style={{ flexShrink: 0, marginLeft: 16 }}>
+                    <input
+                      type="password"
+                      style={{ ...settingInputStyle, width: 380, textAlign: 'left' }}
+                      value={githubToken}
+                      placeholder={githubTokenMasked ? '변경하려면 입력' : 'ghp_...'}
+                      onChange={(e) => setGithubToken(e.target.value)}
+                    />
                   </div>
                 </div>
               </div>

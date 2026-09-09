@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import { DEFAULT_RETRY_COUNT, DEFAULT_ALERT_THRESHOLD, DEFAULT_MAX_CONCURRENT_AGENTS } from '@/lib/constants';
 import { logError } from '@/lib/error-logger';
 
-const SETTING_KEYS = ['retry_count', 'retry_strategy', 'plan_base_cost', 'overage_limit', 'alert_threshold', 'max_concurrent_agents'] as const;
+const SETTING_KEYS = ['retry_count', 'retry_strategy', 'plan_base_cost', 'overage_limit', 'alert_threshold', 'max_concurrent_agents', 'skills_account_url'] as const;
 
 const DEFAULTS: Record<string, string> = {
   retry_count: String(DEFAULT_RETRY_COUNT),
@@ -15,6 +15,8 @@ const DEFAULTS: Record<string, string> = {
   overage_limit: '2000',
   alert_threshold: String(DEFAULT_ALERT_THRESHOLD),
   max_concurrent_agents: String(DEFAULT_MAX_CONCURRENT_AGENTS),
+  // 스킬 계정 주소 (예: https://github.com/Jeonyunjae-Skills). 저장소 하나 = 스킬 하나.
+  skills_account_url: '',
 };
 
 export async function GET(request: NextRequest) {
@@ -38,6 +40,7 @@ export async function GET(request: NextRequest) {
         overageLimit: parseFloat(settingsMap.get('overage_limit') || DEFAULTS.overage_limit),
         alertThreshold: parseFloat(settingsMap.get('alert_threshold') || DEFAULTS.alert_threshold),
         maxConcurrentAgents: parseInt(settingsMap.get('max_concurrent_agents') || DEFAULTS.max_concurrent_agents),
+        skillsAccountUrl: settingsMap.get('skills_account_url') || DEFAULTS.skills_account_url,
       },
     });
   } catch (error) {
@@ -67,6 +70,7 @@ export async function PUT(request: NextRequest) {
       overageLimit: 'overage_limit',
       alertThreshold: 'alert_threshold',
       maxConcurrentAgents: 'max_concurrent_agents',
+      skillsAccountUrl: 'skills_account_url',
     };
 
     for (const [camelKey, value] of Object.entries(body)) {

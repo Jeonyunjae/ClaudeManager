@@ -54,18 +54,37 @@ export const agents = pgTable('agents', {
 ]);
 
 // 2.4 skills
+/**
+ * 스킬 카탈로그.
+ *
+ * 진실 소스는 git 스킬 저장소이고 이 테이블은 조회용 캐시다
+ * (DR001 §5 "data = 진실 소스, DB = 파생 뷰" 와 같은 구조).
+ * 동기화는 저장소 → DB 한 방향이며, 충돌 시 저장소가 이긴다.
+ *
+ * bash 스킬 시절 컬럼(parent_skill: 단일 상속, schema_json: schema 모드)은
+ * 조합·bash 폐기로 의미가 사라져 제거했다.
+ */
 export const skills = pgTable('skills', {
   id: serial('id').primaryKey(),
-  name: text('name').notNull().unique(),
+  name: text('name').notNull().unique(),          // 폴더명 = 식별자
   displayName: text('display_name').notNull(),
   description: text('description'),
-  version: text('version').notNull(),
-  parentSkill: text('parent_skill'),
-  schemaJson: text('schema_json'),
-  filePath: text('file_path').notNull(),
+  version: text('version'),                       // 최신 릴리즈/태그. 없을 수 있다
+  category: text('category'),                     // GitHub Topics 첫 항목
+  topics: text('topics'),                         // Topics 전체 (JSON 배열 문자열)
+  status: text('status').notNull().default('active'),  // 'active' | 'archived' (사용자가 정함)
+  isPrivate: boolean('is_private').notNull().default(true),
+  defaultBranch: text('default_branch'),
+  filePath: text('file_path').notNull(),          // 소유자/저장소 (예: Jeonyunjae-Skills/web-app)
+  repoUrl: text('repo_url'),                      // 저장소 웹 URL (화면에서 클릭 이동)
+  repoPushedAt: text('repo_pushed_at'),           // GitHub 기준 마지막 푸시 시각
+  syncedAt: text('synced_at'),                    // 마지막 동기화 시각
   createdAt: text('created_at').notNull().default(sql`now()::text`),
   updatedAt: text('updated_at').notNull().default(sql`now()::text`),
-});
+}, (table) => [
+  index('idx_skills_category').on(table.category),
+  index('idx_skills_status').on(table.status),
+]);
 
 // 2.5 projects
 export const projects = pgTable('projects', {

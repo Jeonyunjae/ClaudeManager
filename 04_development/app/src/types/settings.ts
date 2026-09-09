@@ -5,6 +5,8 @@ export type GlobalSettings = {
   overageLimit: number;
   alertThreshold: number;
   maxConcurrentAgents: number;
+  /** 스킬 계정 주소. 저장소 하나 = 스킬 하나. */
+  skillsAccountUrl?: string;
 };
 
 export type PartPolicy = {

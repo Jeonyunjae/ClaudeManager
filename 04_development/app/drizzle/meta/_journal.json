@@ -43,6 +43,13 @@
       "when": 1788933506051,
       "tag": "0005_skills_github_drop",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789107544353,
+      "tag": "0006_agents_single_main",
+      "breakpoints": true
     }
   ]
 }

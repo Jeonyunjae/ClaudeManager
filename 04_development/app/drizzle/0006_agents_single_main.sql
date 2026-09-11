@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "ux_agents_single_main" ON "agents" USING btree ("role") WHERE role = 'main';

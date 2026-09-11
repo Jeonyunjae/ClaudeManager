@@ -1,4 +1,4 @@
-import { pgTable, text, integer, doublePrecision, serial, boolean, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, doublePrecision, serial, boolean, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // 2.1 users
@@ -51,6 +51,10 @@ export const agents = pgTable('agents', {
   index('idx_agents_parent').on(table.parentId),
   index('idx_agents_status').on(table.status),
   index('idx_agents_role').on(table.role),
+  // Main 은 하나뿐이다. init-main 이 "조회 → 없으면 삽입" 두 단계로 동작해서,
+  // 화면이 열릴 때 요청이 동시에 둘 들어오면 둘 다 "없음"을 보고 둘 다 넣었다
+  // (실제로 3ms 간격으로 중복 생성된 적이 있다). 경쟁은 DB 제약으로 막는다.
+  uniqueIndex('ux_agents_single_main').on(table.role).where(sql`role = 'main'`),
 ]);
 
 // 2.4 skills

@@ -1436,6 +1436,16 @@ function NoteTab() {
 /* ═══════════════════════════════════════════════
    MAIN POPUP
    ═══════════════════════════════════════════════ */
+/**
+ * 팝업 초기 크기 — 탭별 화면 비율과 하한(기존 고정값).
+ * 대화는 로그가 세로로 쌓이니 높이를, 노트는 본문 폭이 필요하니 가로를 더 준다.
+ */
+const RATIO_BY_TAB = {
+  default: { w: 0.70, h: 0.80, minW: 640, minH: 560 },
+  chat: { w: 0.70, h: 0.85, minW: 640, minH: 700 },
+  note: { w: 0.78, h: 0.82, minW: 820, minH: 600 },
+} as const;
+
 export function AgentDetailPopup() {
   const { selectedAgent, isOpen, isLoading, activeTab, closeAgent, setActiveTab } = useAgentDetailStore();
 
@@ -1453,23 +1463,18 @@ export function AgentDetailPopup() {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
-    // Determine initial size by active tab
-    let w = 640;
-    let h = 560;
-    if (activeTab === 'chat') {
-      w = 640;
-      h = 700;
-    } else if (activeTab === 'note') {
-      w = 820;
-      h = 600;
-    }
+    // 초기 크기는 화면 비율로 정한다. 고정 픽셀(640×560)이면 큰 모니터에서
+    // 화면 한복판에 작은 창이 떠 여백만 남고, 노트·로그 표는 가로가 모자란다.
+    // 비율만 쓰면 반대로 작은 화면에서 읽을 수 없게 줄어들므로, 기존 고정값을
+    // 하한으로 두고 "비율과 하한 중 큰 쪽, 단 화면을 넘지 않게"로 잡는다.
+    const ratio = RATIO_BY_TAB[activeTab as keyof typeof RATIO_BY_TAB] ?? RATIO_BY_TAB.default;
 
     const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
     const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
     const maxW = Math.max(420, vw - 40);
     const maxH = Math.max(360, vh - 40);
-    const width = Math.min(w, maxW);
-    const height = Math.min(h, maxH);
+    const width = Math.min(maxW, Math.max(ratio.minW, Math.round(vw * ratio.w)));
+    const height = Math.min(maxH, Math.max(ratio.minH, Math.round(vh * ratio.h)));
 
     setSize({ width, height });
     setPosition({

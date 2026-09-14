@@ -1,6 +1,87 @@
 # 개발 현황
-> 작성: developer | 상태: Phase 5 PostgreSQL 마이그레이션 + 비동기 채팅 + UI 개선 완료
+> 작성: developer | 상태: Phase 6 Spark(Linux) 운영 결함 수정 완료
 > 빌드 결과: SUCCESS (Next.js 16.2.3, Turbopack)
+> 최종 갱신: 2026-09-14
+
+---
+
+## Phase 6 Spark 운영 결함 수정 (2026-09-11 ~ 09-14)
+
+> 커밋 `d18524d` · 워크스테이션에서 띄우고 다른 PC 브라우저로 접속하는
+> 실제 사용 형태로 처음부터 돌려보며 드러난 결함 6건.
+
+### 실행 환경 (현재 값)
+
+| 항목 | 값 |
+|---|---|
+| 호스트 | spark-3f44 / 192.168.30.24 (Ubuntu aarch64) |
+| 웹 앱 | 3010 (`.env.local` 의 `PORT`) |
+| WebSocket | 3001 (Next instrumentation 이 기동. `ws:dev` 를 따로 띄우면 포트 충돌) |
+| PostgreSQL | 5434 (docker compose, 컨테이너 `claudemanager-db`) |
+| 접속 | http://192.168.30.24:3010 — 3000 번은 다른 서비스(Open WebUI)가 점유 |
+
+### 수정 내역
+
+| # | 증상 | 원인 | 수정 |
+|---|---|---|---|
+| 1 | LAN 접속 시 모든 입력·버튼이 죽음 | Next dev 가 localhost 아닌 출처의 `/_next/*` 를 차단 → 하이드레이션 실패 | `next.config.ts` 에 `allowedDevOrigins` |
+| 2 | 백업 파일이 0바이트 | `pg_dump ... > file` 을 셸에 넘겨, 명령 실패와 무관하게 빈 파일 생성. 실패를 `completed` 로 기록 | stdout 직접 기록 + pg 커넥션 폴백 덤프 |
+| 3 | `ORCHESTRATOR_DIR` 무시 | `A \|\| B ? x : y` 연산자 우선순위 | 분기 분리 |
+| 4 | Main 에이전트 중복 생성 | `init-main` 의 조회→삽입이 비원자적 (3ms 간격 중복 발생) | `ux_agents_single_main` 부분 유니크 인덱스(0006) + 23505 처리 |
+| 5 | 마이그레이션이 조용히 누락 | drizzle-kit 이 `.env.local` 을 안 읽어 폴백 DB 로 접속, 스피너가 에러를 덮음 | `drizzle.config.ts` 에서 직접 로드, 폴백 제거 |
+| 6 | `pnpm dev` 가 `PORT` 무시 | Next 는 포트 결정 후 `.env.local` 을 읽음 | `scripts/next-with-env.mjs` 래퍼 |
+
+### 함께 처리한 데이터 복구
+
+DB 볼륨이 새로 생성돼 에이전트 레코드가 전부 비어 있었다. 파일로 남아 있던
+`~/.claudemanager/.orchestrator/<partId>/sub-contexts/<agentId>.md` 의 **경로가 곧 ID**여서
+(POST /api/agents 의 저장 규칙), 같은 ID로 Part·Sub 를 복원했다.
+
+| 대상 | 값 |
+|---|---|
+| Part | Software (`software-development-methodology`) |
+| Sub | LLMManager · opus · project-root `~/.claudemanager/projects/LLMManager` |
+
+중복 Main 중 참조 0건인 쪽은 감사 로그를 남기고 삭제했다.
+복구·삭제 모두 `audit_logs` 에 `restore_agent` / `delete_agent` 로 기록돼 있다.
+
+### 신규 파일
+
+| 파일 | 설명 |
+|---|---|
+| `scripts/next-with-env.mjs` | `.env.local` 의 PORT 로 Next 를 띄우는 래퍼 |
+| `drizzle/0006_agents_single_main.sql` | Main 단일성 부분 유니크 인덱스 |
+
+### 검증 결과
+
+- `pnpm build`: SUCCESS
+- `pnpm db:migrate`: 셸 환경변수 없이 exit 0 (수정 전 exit 1, 무출력)
+- 중복 Main 삽입 시도 → 23505 차단 확인
+- `performBackup()` → 0바이트에서 6.2KB (7개 테이블 11행) 로 개선.
+  이후 9/12·9/13 자동 백업도 각각 6.5KB·6.8KB 로 정상 기록
+- LAN 접속 하이드레이션: 헤드리스 Chromium 으로 수정 전/후 대조
+  (React fiber 부착 여부, 설정 완료 버튼 활성 여부)
+- `pnpm dev` 가 인자 없이 3010 바인딩
+- lint 오류 32건은 전부 기존 것 (이번 변경 파일에서 신규 발생 0건)
+
+### 에이전트 상세 팝업 기본 크기
+
+고정 640×560 이라 큰 모니터에서 작게 떴다. 탭별 화면 비율로 잡되 기존 고정값을
+하한으로 둔다 — 비율만 쓰면 작은 화면에서 되레 줄어들기 때문이다.
+
+| 탭 | 비율 | 1920×1080 기준 |
+|---|---|---|
+| 정보·로그 | 70% × 80% (하한 640×560) | 1344 × 864 |
+| 대화 | 70% × 85% (하한 640×700) | 1344 × 918 |
+| 노트 | 78% × 82% (하한 820×600) | 1498 × 886 |
+
+끌어서 조절·이동하는 기존 동작(react-rnd)은 그대로다.
+
+### 남은 것
+
+- 예전 DB 볼륨 잔존 여부 확인 (`sudo docker volume ls`) — sudo 필요로 미확인
+- `tsconfig.tsbuildinfo` 가 빌드 산출물인데 git 에 추적돼 계속 변경됨
+- `src/__tests__/` 타입 오류 다수 — SQLite 시절 테스트가 PostgreSQL 전환 후 방치됨
 
 ---
 

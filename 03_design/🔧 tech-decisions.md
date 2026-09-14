@@ -18,10 +18,10 @@
 - CSS: Tailwind CSS + shadcn/ui (데이터 뷰, 설정 등 일반 UI)
 
 ## 4. 데이터베이스
-- 종류: PostgreSQL (로컬 설치, port 5433)
+- 종류: PostgreSQL (로컬 설치, port 5434)
 - ORM: Drizzle ORM (drizzle-orm/pg-core, 타입 안전)
 - 드라이버: node-postgres (pg)
-- 호스팅: 로컬 PostgreSQL (`postgresql://claudemanager:claudemanager@localhost:5433/claudemanager`)
+- 호스팅: 로컬 PostgreSQL (`postgresql://claudemanager:claudemanager@localhost:5434/claudemanager`)
 - 마이그레이션: Drizzle Kit
 
 ## 5. 서버 / 인프라

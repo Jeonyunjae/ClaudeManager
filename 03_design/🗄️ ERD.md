@@ -1,7 +1,7 @@
 # 데이터베이스 설계 (ERD)
-> 작성: designer | 상태: 작성 완료 | 최종 갱신: 2026-04-27
+> 작성: designer | 상태: 작성 완료 | 최종 갱신: 2026-09-14
 > PostgreSQL + Drizzle ORM (drizzle-orm/pg-core) 기반 테이블 정의
-> 연결: `postgresql://claudemanager:claudemanager@localhost:5433/claudemanager`
+> 연결: `postgresql://claudemanager:claudemanager@localhost:5434/claudemanager`
 
 ---
 
@@ -86,6 +86,9 @@ export const agents = pgTable('agents', {
   index('idx_agents_parent').on(table.parentId),
   index('idx_agents_status').on(table.status),
   index('idx_agents_role').on(table.role),
+  // Main 은 하나뿐이라는 규칙을 DB 제약으로 강제한다 (0006).
+  // init-main 의 "조회 → 없으면 삽입" 이 동시 요청에서 중복을 만들었다.
+  uniqueIndex('ux_agents_single_main').on(table.role).where(sql`role = 'main'`),
 ]);
 ```
 

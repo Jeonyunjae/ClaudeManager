@@ -46,7 +46,7 @@ flowchart TB
     subgraph SERVER["서버 (Mac Mini)"]
         NEXT_SERVER["Next.js Server (API Routes)"]
         WS_SERVER["WebSocket Server (ws)"]
-        PG["PostgreSQL (node-postgres, port 5433)"]
+        PG["PostgreSQL (node-postgres, port 5434)"]
         DRIZZLE["Drizzle ORM"]
         CHOKIDAR["chokidar (파일 감시)"]
         AGENT_MGR["agent-manager.ts (child_process.spawn)"]

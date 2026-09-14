@@ -60,6 +60,33 @@ DB 볼륨이 새로 생성돼 에이전트 레코드가 전부 비어 있었다.
 - `pnpm dev` 가 인자 없이 `.env.local` 의 포트에 바인딩
 - lint 오류 32건은 전부 기존 것 (이번 변경 파일에서 신규 발생 0건)
 
+### 테스트 정리 (SQLite 잔재 제거)
+
+앱은 Phase 5 에서 PostgreSQL 전용이 됐는데 테스트는 SQLite 시절 그대로였다.
+`pnpm test` 가 19개 파일 실패로 상시 빨간불이어서, 새 회귀가 나도 묻혔다.
+
+**삭제 — 15개 파일(161 케이스).** `integration/` 의 이른바 통합 테스트들은
+`new Database(':memory:')` 로 자기 SQLite 를 만들고 `CREATE TABLE` 을 손으로 쓴 뒤
+거기에 insert/select 했다. 앱 라우트를 부르는 파일은 0개였다. 즉 "Drizzle 이
+넣은 걸 다시 읽으면 나온다"를 프로덕션과 다른 DB 엔진에서 확인하던 것으로,
+앱이 통째로 망가져도 통과한다. 되살릴 값이 없어 지운다.
+
+**수정 — 5개 파일.** 실제 앱 코드를 대상으로 하므로 PG 형태로 다시 썼다.
+
+| 파일 | 문제 |
+|---|---|
+| `agent-queue` | 동기 `.get()`/`.all()` 기대 → await 가능한 빌더로 모킹 변경 |
+| `backup-scheduler` | "SQLite 파일 복사 + wal_checkpoint" 검증 → pg_dump/폴백 덤프 검증으로 재작성 |
+| `error-logger` | `values()` 가 `{run}` 을 돌려줘 구현의 `.then()` 이 터짐 |
+| `key-expiry-checker` | 동기 호출 + 조회를 둘로 나눈 옛 구현 가정 |
+| `schema` | 0003 에서 제거된 컬럼(`parentSkill`·`schemaJson`) 기대 |
+
+**의존성 제거.** `better-sqlite3`·`@types/better-sqlite3` 가 Phase 5 기록과 달리
+실제로는 남아 있었다. 제거하고 `onlyBuiltDependencies` 에서도 뺐다.
+SQLite 전용이던 `scripts/seed-demo.ts` 도 함께 삭제했다.
+
+결과: **47개 파일 499 케이스 전부 통과, exit 0.** tsc 오류도 56 → 25 로 줄었다.
+
 ### 에이전트 상세 팝업 기본 크기
 
 고정 640×560 이라 큰 모니터에서 작게 떴다. 탭별 화면 비율로 잡되 기존 고정값을
@@ -75,7 +102,10 @@ DB 볼륨이 새로 생성돼 에이전트 레코드가 전부 비어 있었다.
 
 ### 남은 것
 
-- `src/__tests__/` 타입 오류 다수 — SQLite 시절 테스트가 PostgreSQL 전환 후 방치됨
+- `src/__tests__/` 의 타입 오류 25건 (테스트 자체는 통과). orchestrator·SC-012·
+  costStore·settingsStore 등에 남아 있으며 런타임 동작과는 무관하다
+- `scripts/migrate-data.mjs` — SQLite→PG 일회성 이관 스크립트. 이관은 끝났고
+  better-sqlite3 도 제거돼 더는 실행할 수 없다. 기록으로 남길지 정해야 한다
 
 닫은 항목:
 - ~~빌드 산출물 추적~~ → `.gitignore` 로 옮기고 인덱스에서 제거 (`e4058b5`)

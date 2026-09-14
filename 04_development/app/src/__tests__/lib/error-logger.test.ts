@@ -15,8 +15,14 @@ vi.mock('@/lib/ws-bridge', () => ({
 }));
 
 // Mock db
+// PostgreSQL 전환 반영: 구현이 `.values(...).then().catch()` 로 fire-and-forget
+// 하므로 values() 는 Promise 를 돌려줘야 한다. 예전 SQLite 형태({ run })로 두면
+// 구현에서 TypeError 가 나고, 그 뒤의 브로드캐스트까지 건너뛰어 엉뚱한 곳이 깨진다.
 const mockRun = vi.fn();
-const mockValues = vi.fn().mockReturnValue({ run: mockRun });
+const mockValues = vi.fn((_values: Record<string, unknown>) => {
+  mockRun();
+  return Promise.resolve();
+});
 const mockInsert = vi.fn().mockReturnValue({ values: mockValues });
 const mockDb = { insert: mockInsert };
 
@@ -55,7 +61,7 @@ describe('error-logger.ts - 에러 DB 저장', () => {
       const insertedValues = mockValues.mock.calls[0][0];
       expect(insertedValues.message).toBe('Stack test');
 
-      const detail = JSON.parse(insertedValues.detail);
+      const detail = JSON.parse(insertedValues.detail as string);
       expect(detail.stack).toBeDefined();
       expect(detail.stack).toContain('Stack test');
     });
@@ -80,7 +86,7 @@ describe('error-logger.ts - 에러 DB 저장', () => {
         resourceId: 'setting-123',
       });
 
-      const detail = JSON.parse(mockValues.mock.calls[0][0].detail);
+      const detail = JSON.parse(mockValues.mock.calls[0][0].detail as string);
       expect(detail.requestPath).toBe('/api/settings');
       expect(detail.resourceId).toBe('setting-123');
     });
@@ -90,7 +96,7 @@ describe('error-logger.ts - 에러 DB 저장', () => {
         context: { customField: 'value', count: 42 },
       });
 
-      const detail = JSON.parse(mockValues.mock.calls[0][0].detail);
+      const detail = JSON.parse(mockValues.mock.calls[0][0].detail as string);
       expect(detail.customField).toBe('value');
       expect(detail.count).toBe(42);
     });

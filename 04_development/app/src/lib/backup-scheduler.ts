@@ -144,8 +144,14 @@ async function dumpDatabase(databaseUrl: string, filePath: string): Promise<numb
 
     lines.push('COMMIT;', '');
     const sql = lines.join('\n');
+    const bytes = Buffer.byteLength(sql);
+
+    // 빈 덤프를 남기지 않는다. 0바이트 파일이 성공으로 기록되던 것이 이 함수를
+    // 고친 이유이므로, 여기서도 같은 결과를 만들지 않는다.
+    if (bytes === 0) throw new Error('덤프가 비어 있다');
+
     fs.writeFileSync(filePath, sql, 'utf-8');
-    return Buffer.byteLength(sql);
+    return bytes;
   } finally {
     client.release();
   }

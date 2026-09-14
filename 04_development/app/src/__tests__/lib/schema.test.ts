@@ -53,9 +53,15 @@ describe('schema.ts - 17 테이블 정의 검증', () => {
     expect(skills.name).toBeDefined();
     expect(skills.displayName).toBeDefined();
     expect(skills.version).toBeDefined();
-    expect(skills.parentSkill).toBeDefined();
-    expect(skills.schemaJson).toBeDefined();
     expect(skills.filePath).toBeDefined();
+    // bash 스킬 시절 컬럼(parentSkill: 단일 상속, schemaJson: schema 모드)은
+    // 조합·bash 폐기로 의미가 사라져 0003 에서 제거됐다. 지금은 GitHub 저장소가
+    // 진실 소스이고 이 테이블은 그 캐시다.
+    expect(skills.category).toBeDefined();
+    expect(skills.topics).toBeDefined();
+    expect(skills.isPrivate).toBeDefined();
+    expect(skills.repoUrl).toBeDefined();
+    expect(skills.syncedAt).toBeDefined();
   });
 
   it('projects 테이블 정의 (F019~F021)', () => {

@@ -9,3 +9,8 @@ node_modules/
 .claude/
 .rollback_backup/
 /04_development/app/data/
+
+# 빌드 산출물 — 추적하면 빌드할 때마다 작업 트리가 더러워지고
+# 커밋마다 의미 없는 변경이 섞인다. next-env.d.ts 는 Next 가 재생성한다.
+/04_development/app/tsconfig.tsbuildinfo
+/04_development/app/next-env.d.ts

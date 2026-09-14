@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 값이 facts 문서 밖에 하드코딩됐는지 검사한다.
+# 문서 검사 — (1) 값이 facts 밖에 하드코딩됐는지 (2) 개행이 이스케이프됐는지.
 #
 # 왜: DB 포트가 5433 인 채로 네 문서에 박혀 있었고, 실제 값은 5434 로 바뀐 지
 # 오래였다. 문서대로 접속하면 이 장비의 5432 에 떠 있는 다른 프로젝트의 DB 에
@@ -46,9 +46,25 @@ check() {  # check <값> <설명> <앵커>
 for p in $ports; do check "$p" "포트 $p" "#포트"; done
 [ -n "$host" ] && check "$host" "랜 주소" "#호스트"
 
+# 개행이 이스케이프된 채 저장된 문서를 잡는다.
+#
+# 왜: 문서 두 개가 `# 배포 피드백\n\n## 상태\n...` 처럼 한 줄로 저장돼 있었다.
+# 마크다운으로 렌더되지 않아 내용이 있어도 읽을 수 없다. 생성한 스크립트는
+# 저장소에 없고 커밋 시점의 일회성 사고였지만, 같은 방식으로 다시 들어오면
+# 눈으로는 잘 안 보이므로(파일 크기가 작아 그냥 빈 템플릿처럼 보인다) 기계가 본다.
+while IFS= read -r file; do
+  [[ "$file" =~ $EXCLUDE_RE ]] && continue
+  while IFS= read -r line; do
+    printf '%s : 개행이 이스케이프됨 (한 줄로 저장)\n  %s\n  → 실제 개행으로 저장할 것\n' \
+           "${file#./}" "$line"
+    violations=$((violations + 1))
+  done < <(awk '/^[[:space:]]*```/ { inside = !inside; next } !inside { print FNR": "$0 }' "$file" \
+           | grep -F '\n' | grep -vF '`' | cut -c1-100)
+done < <(find . -name '*.md' -not -path './node_modules/*' -not -path '*/app/*' -print)
+
 if [ "$violations" -gt 0 ]; then
   echo
-  echo "✖ $violations 곳에서 값이 facts 밖에 적혀 있다."
+  echo "✖ 문서 문제 $violations 건."
   exit 1
 fi
 

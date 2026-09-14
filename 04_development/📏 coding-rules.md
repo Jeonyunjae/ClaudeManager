@@ -156,7 +156,7 @@
 - Version lock: `skill-version.lock` per Part directory
 
 ### WebSocket Bridge
-- WS server runs separately from Next.js on port 3001
+- WS server runs in its own port — see [[📇 facts#포트]]
 - API routes broadcast via `src/lib/ws-bridge.ts` (HTTP POST to `/_broadcast`)
 - Fire-and-forget: broadcast failures never break API routes
 - Internal auth: `x-ws-secret` header

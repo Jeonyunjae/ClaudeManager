@@ -1,7 +1,7 @@
 # 데이터베이스 설계 (ERD)
 > 작성: designer | 상태: 작성 완료 | 최종 갱신: 2026-09-14
 > PostgreSQL + Drizzle ORM (drizzle-orm/pg-core) 기반 테이블 정의
-> 연결: `postgresql://claudemanager:claudemanager@localhost:5434/claudemanager`
+> 연결 문자열·포트는 [[📇 facts#접속 문자열]] 참조 (값의 단일 소스)
 
 ---
 

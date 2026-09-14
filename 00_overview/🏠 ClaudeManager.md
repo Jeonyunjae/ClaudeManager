@@ -8,7 +8,7 @@ Claude Code 세션을 웹 UI 에서 4계층(Main → Part → Sub → Instance)�
 
 | | |
 |---|---|
-| 접속 | http://192.168.30.24:3010 |
+| 접속 | [[📇 facts#호스트]] |
 | 최신 커밋 | `d18524d` (2026-09-14 기준) |
 | 기동 절차 | [[06_deployment/🚀 deploy-guide\|🚀 배포 가이드]] |
 
@@ -37,6 +37,35 @@ Claude Code 세션을 웹 UI 에서 4계층(Main → Part → Sub → Instance)�
   (Software / LLMManager Sub)
 - 자동 백업 2회(9/12·9/13) 정상 동작 확인
 - 상세: [[04_development/📊 progress|📊 개발 현황]] Phase 6
+
+## 📑 어디에 무엇이 있나 (문서 소유권)
+
+같은 내용을 여러 문서가 각자 적으면 반드시 어긋난다 — 실제로 DB 포트가 네 문서에
+옛 값인 채로 남아, 문서대로 따라 하면 다른 프로젝트의 DB 에 붙는 상태였다
+(경위는 [[99_reference/📇 facts\|📇 facts]] 서두). 주제마다 **원본 문서 하나**를 정하고,
+나머지는 옮겨 적지 말고 가리킨다.
+
+| 주제 | 원본 (여기만 고친다) | 나머지 문서는 |
+|---|---|---|
+| 포트·호스트·경로·명령·버전 | [[99_reference/📇 facts\|📇 facts]] | 값을 적지 않고 링크 |
+| 4계층 구조의 정의 | [[02_concept/📌 DR001-yj-manager-hierarchy\|📌 DR001]] | 자기 맥락의 요약 + 링크 |
+| 권한 경계 | [[02_concept/📌 DR002-yj-manager-permission-boundary\|📌 DR002]] | 요약 + 링크 |
+| DB 스키마 | [[03_design/🗄️ ERD\|🗄️ ERD]] | 링크 |
+| API 계약 | [[03_design/🔌 API\|🔌 API]] | 링크 |
+| 기동·복구 절차 | [[06_deployment/🚀 deploy-guide\|🚀 배포 가이드]] | 링크 |
+| 기능별 진행 상태 | [[01_planning/📊 feature-tracking\|📊 기능 추적]] | 링크 |
+| 개발 변경 이력 | [[04_development/📊 progress\|📊 개발 현황]] | 링크 |
+
+> **개념 설명까지 링크로 바꾸지는 않는다.** 4계층 구조가 17개 문서에 나오는 건 대부분
+> 정상이다 — 각자 필요한 만큼 자기 맥락에서 말하는 것이라서다. 다만 *정의*가 갈리면
+> 원본(DR001)을 따른다.
+
+### 썩음 방지
+
+```bash
+bash .scripts/check-doc-facts.sh   # 값이 facts 밖에 적혔는지
+bash .scripts/check-runtime.sh     # 포트·응답·백업 상태 (값은 facts 에서 읽는다)
+```
 
 ## 📋 빠른 링크
 - [[01_planning/📋 requirements-input|✏️ 요구사항 작성]]

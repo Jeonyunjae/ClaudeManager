@@ -209,7 +209,7 @@
 > | 오류 로그 | `error_logs` | 에이전트별 에러 기록 |
 > | 감사 로그 | `audit_logs` | 모든 시스템 이벤트 기록 |
 > 
-> 실시간 데이터(CPU/MEM 게이지)는 WebSocket(포트 3001)으로 푸시, 이력 데이터는 REST API로 조회.
+> 실시간 데이터(CPU/MEM 게이지)는 WebSocket([[📇 facts#포트]])으로 푸시, 이력 데이터는 REST API로 조회.
 
 ---
 

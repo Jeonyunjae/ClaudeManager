@@ -83,14 +83,14 @@
                │ HTTP (REST)      │ WS (ws://)
 ┌──────────────▼──────────┐ ┌────▼─────────────────┐
 │   Next.js API Routes    │ │   WebSocket Server    │
-│   (44 endpoints)        │ │   (ws, port 3001)     │
+│   (44 endpoints)        │ │   (WebSocket)         │
 │   JWT Auth              │ │   CLI Executor        │
 │   WS Bridge (HTTP→WS)  │ │   Real-time Broadcast │
 └──────────────┬──────────┘ └────┬─────────────────┘
                │                 │
 ┌──────────────▼─────────────────▼─────────────────┐
 │              PostgreSQL (Drizzle ORM)             │
-│              21 tables, port 5434                 │
+│                    21 tables                      │
 └──────────────────────────┬───────────────────────┘
                            │
 ┌──────────────────────────▼───────────────────────┐
@@ -182,7 +182,7 @@
 
 ### 4-5. SQLite → PostgreSQL 마이그레이션
 **문제:** SQLite의 동시 쓰기 제한으로 다중 에이전트 환경에서 DB 잠금 발생
-**해결:** PostgreSQL(port 5434)로 마이그레이션, Drizzle ORM 스키마 재정의, node-postgres Pool 기반 커넥션 관리
+**해결:** PostgreSQL로 마이그레이션, Drizzle ORM 스키마 재정의, node-postgres Pool 기반 커넥션 관리
 
 ### 4-6. 응답 속도 최적화
 **문제:** 24KB 시스템 프롬프트가 `--continue` 세션에서도 매번 재전송되어 불필요한 지연

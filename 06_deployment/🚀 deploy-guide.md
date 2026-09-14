@@ -7,21 +7,12 @@
 
 ## 1. 대상 환경
 
-| 항목 | 값 |
-|---|---|
-| 호스트 | spark-3f44 (Ubuntu, aarch64) |
-| 랜 주소 | 192.168.30.24 |
-| Node | v22 (pnpm 9) |
-| 웹 앱 | **3010** |
-| WebSocket | **3001** |
-| PostgreSQL | **5434** (docker, 컨테이너 `claudemanager-db`) |
+호스트·포트·경로·스택 버전은 **[[📇 facts]]** 에 있다 — 이 문서는 값을 옮겨 적지 않는다.
+([[📇 facts#포트]] · [[📇 facts#호스트]] · [[📇 facts#경로]])
 
-포트는 `04_development/app/.env.local` 의 `PORT` · `WS_PORT` · `DATABASE_URL` 이 진실 소스다.
-
-> **3000 번을 쓰지 않는다.** 이 장비에서는 Open WebUI 가 점유하고 있다.
-> `next dev` 는 포트를 정한 뒤에야 `.env.local` 을 읽기 때문에, 과거 3002 같은
-> 엉뚱한 포트로 떠서 접속이 어긋난 적이 있다. 지금은 `scripts/next-with-env.mjs`
-> 래퍼가 `PORT` 를 먼저 읽어 `--port` 로 넘긴다.
+> `next dev` 는 포트를 정한 뒤에야 `.env.local` 을 읽는다. 그래서 과거 엉뚱한 포트로
+> 떠서 접속이 어긋난 적이 있다. 지금은 `scripts/next-with-env.mjs` 래퍼가 `PORT` 를
+> 먼저 읽어 `--port` 로 넘긴다.
 
 ---
 
@@ -55,7 +46,7 @@ pnpm dev          # 개발. PORT(3010) + WS(3001) 를 함께 띄운다
 ```
 
 WebSocket 서버는 **Next 의 instrumentation 이 함께 기동한다.**
-`pnpm ws:dev` 를 따로 실행하면 3001 포트가 겹쳐 `EADDRINUSE` 가 난다 — 둘 중 하나만 띄운다.
+`pnpm ws:dev` 를 따로 실행하면 WS 포트가 겹쳐 `EADDRINUSE` 가 난다 — 둘 중 하나만 띄운다.
 
 기동 확인:
 
@@ -75,9 +66,7 @@ WebSocket 서버는 **Next 의 instrumentation 이 함께 기동한다.**
 
 ## 3. 랜에서 접속하기
 
-```
-http://192.168.30.24:3010
-```
+접속 주소는 [[📇 facts#호스트]].
 
 `next.config.ts` 의 `allowedDevOrigins` 에 접속 출처가 등록돼 있어야 한다.
 빠져 있으면 **화면은 그려지는데 버튼·입력이 전부 먹지 않는다** — Next dev 가
@@ -132,10 +121,11 @@ sudo docker exec -i claudemanager-db psql -U claudemanager -d claudemanager < <�
 ## 5. 상태 점검
 
 ```bash
-ss -ltn | grep -E ':(3001|3010|5434)'          # 포트
-curl -s -o /dev/null -w '%{http_code}\n' http://192.168.30.24:3010/
-ls -la ~/.claudemanager/backups | tail -4      # 백업이 0바이트가 아닌지
+bash .scripts/check-runtime.sh
 ```
+
+포트 3개가 LISTEN 인지, 앱이 200 을 주는지, 최근 백업이 0바이트가 아닌지를 본다.
+검사에 쓰는 값은 [[📇 facts]] 에서 읽으므로 포트가 바뀌어도 스크립트는 그대로다.
 
 `0바이트 덤프가 completed 로 기록되던 버그`가 있었으므로, 백업은 DB 기록이 아니라
 **파일 크기로** 확인한다.

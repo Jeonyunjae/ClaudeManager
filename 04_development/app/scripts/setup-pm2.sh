@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
 #
-# PM2 Setup Script for ClaudeManager
+# PM2 설정 스크립트 — Spark 워크스테이션(Linux)용
 #
-# Installs PM2 globally, starts the application, sets up auto-start with launchd.
+# 부팅 자동 기동은 `pm2 startup`(systemd 시스템 유닛) 대신 사용자 crontab 의
+# @reboot 로 건다. `pm2 startup` 은 sudo 가 필요한데, Claude Code 세션은 TTY 가
+# 없어 암호를 넣을 수 없다. 사용자 systemd 유닛은 linger 가 꺼져 있어(Linger=no)
+# 로그인 전에는 뜨지 않는다. crontab @reboot 는 둘 다 필요 없다.
 #
-# Usage:
-#   ./scripts/setup-pm2.sh install    # Full setup
-#   ./scripts/setup-pm2.sh start      # Start with PM2
-#   ./scripts/setup-pm2.sh stop       # Stop all
-#   ./scripts/setup-pm2.sh status     # Show status
-#   ./scripts/setup-pm2.sh launchd    # Install launchd plist
+# 사용법:
+#   ./scripts/setup-pm2.sh install    # PM2 설치 + 기동 + 저장 + 부팅 등록
+#   ./scripts/setup-pm2.sh start      # PM2 로 기동
+#   ./scripts/setup-pm2.sh stop       # 중지
+#   ./scripts/setup-pm2.sh status     # 상태
+#   ./scripts/setup-pm2.sh boot       # 부팅 자동 기동 등록 (crontab @reboot)
 #
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
-PLIST_SRC="$APP_DIR/com.claudemanager.plist"
-PLIST_DEST="$HOME/Library/LaunchAgents/com.claudemanager.plist"
+CM_HOME="${CLAUDEMANAGER_HOME:-$HOME/.claudemanager}"
+CRON_TAG="# claudemanager-pm2"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -27,46 +30,25 @@ info() { echo -e "${GREEN}[INFO]${NC} $*"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 
 do_install() {
-  info "Installing PM2 globally..."
-  npm install -g pm2
-
-  info "Building application..."
-  cd "$APP_DIR"
-  pnpm run build
-
-  info "Building WebSocket server..."
-  pnpm run ws:build 2>/dev/null || warn "ws:build skipped (tsconfig.ws.json may not exist)"
-
-  info "Creating log directory..."
-  mkdir -p "${CLAUDEMANAGER_HOME:-$APP_DIR}/logs"
-
+  if ! command -v pm2 >/dev/null; then
+    info "PM2 설치 (nvm 의 전역 경로, sudo 불필요)"
+    npm install -g pm2
+  fi
+  mkdir -p "$CM_HOME/logs"
   do_start
-
-  info "Saving PM2 process list..."
   pm2 save
-
-  info "Setup complete!"
-  echo ""
-  info "Commands:"
-  echo "  pm2 status          — View process status"
-  echo "  pm2 logs            — View logs"
-  echo "  pm2 restart all     — Restart all"
-  echo "  pm2 stop all        — Stop all"
-  echo ""
-  info "To enable auto-start on login, run:"
-  echo "  ./scripts/setup-pm2.sh launchd"
+  do_boot
+  info "완료. pm2 status / pm2 logs claudemanager / pm2 restart claudemanager"
 }
 
 do_start() {
-  info "Starting ClaudeManager with PM2..."
   cd "$APP_DIR"
   pm2 start ecosystem.config.js
   pm2 status
 }
 
 do_stop() {
-  info "Stopping all PM2 processes..."
-  pm2 stop all
+  pm2 stop claudemanager
   pm2 status
 }
 
@@ -74,34 +56,14 @@ do_status() {
   pm2 status
 }
 
-do_launchd() {
-  if [[ ! -f "$PLIST_SRC" ]]; then
-    warn "Plist template not found at $PLIST_SRC"
-    exit 1
-  fi
-
-  info "Installing launchd plist..."
-  mkdir -p "$HOME/Library/LaunchAgents"
-
-  # Update the plist with actual username and PM2 path
-  local PM2_PATH
-  PM2_PATH=$(which pm2 2>/dev/null || echo "/usr/local/bin/pm2")
-  local USERNAME
-  USERNAME=$(whoami)
-  local CM_HOME="${CLAUDEMANAGER_HOME:-$HOME/claudemanager}"
-
-  sed -e "s|/usr/local/bin/pm2|$PM2_PATH|g" \
-      -e "s|REPLACE_WITH_USERNAME|$USERNAME|g" \
-      -e "s|/Users/REPLACE_WITH_USERNAME/claudemanager|$CM_HOME|g" \
-      "$PLIST_SRC" > "$PLIST_DEST"
-
-  info "Plist installed at $PLIST_DEST"
-
-  # Load the plist
-  launchctl unload "$PLIST_DEST" 2>/dev/null || true
-  launchctl load "$PLIST_DEST"
-
-  info "launchd agent loaded. ClaudeManager will auto-start on login."
+do_boot() {
+  # cron 은 로그인 셸이 아니라 nvm 이 PATH 에 없다 — 지금 쓰는 node 경로를 박아 둔다.
+  # node 버전을 바꾸면 이 명령을 다시 실행해야 한다.
+  local node_bin line
+  node_bin="$(dirname "$(command -v pm2)")"
+  line="@reboot PATH=$node_bin:/usr/bin:/bin pm2 resurrect >> $CM_HOME/logs/pm2-boot.log 2>&1 $CRON_TAG"
+  { crontab -l 2>/dev/null | grep -vF "$CRON_TAG" || true; echo "$line"; } | crontab -
+  info "crontab 등록: $line"
 }
 
 case "${1:-}" in
@@ -109,16 +71,9 @@ case "${1:-}" in
   start)   do_start ;;
   stop)    do_stop ;;
   status)  do_status ;;
-  launchd) do_launchd ;;
+  boot)    do_boot ;;
   *)
-    echo "PM2 Setup for ClaudeManager"
-    echo ""
-    echo "Usage:"
-    echo "  $0 install    Full setup (install PM2, build, start)"
-    echo "  $0 start      Start with PM2"
-    echo "  $0 stop       Stop all"
-    echo "  $0 status     Show status"
-    echo "  $0 launchd    Install macOS auto-start"
+    sed -n '11,16p' "$0" | sed 's/^# \{0,1\}//'
     exit 1
     ;;
 esac

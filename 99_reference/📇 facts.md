@@ -68,7 +68,8 @@ postgresql://claudemanager:<비밀번호>@127.0.0.1:5434/claudemanager
 | `sudo docker compose up -d` | PostgreSQL 기동 — **sudo 필요** (`dmoa` 는 docker 그룹에 없다) |
 | `pnpm db:migrate` | 마이그레이션 적용 |
 | `pnpm db:generate` | 스키마 변경분으로 마이그레이션 생성 |
-| `pnpm dev` | 개발 기동 (앱 + WS). 포트는 `.env.local` 에서 읽는다 |
+| `pnpm dev` | 개발 기동 (앱 + WS). 포트는 `.env.local` 에서 읽는다. 상시 기동은 PM2 가 하므로 따로 띄우면 포트가 겹친다 |
+| `pm2 restart claudemanager` | 상시 기동 중인 앱 재시작 (`scripts/setup-pm2.sh` 참고) |
 | `pnpm build` | 프로덕션 빌드 |
 | `pnpm lint` / `pnpm test` | 린트 / 테스트 |
 

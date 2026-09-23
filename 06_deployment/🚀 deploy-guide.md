@@ -1,6 +1,6 @@
 # 배포 가이드
-> 작성: deployer | 상태: 작성 완료 (Spark 워크스테이션 기준) | 최종 갱신: 2026-09-14
-> 이 문서의 절차는 2026-09-11 ~ 09-14 에 실제로 수행해 확인한 것이다.
+> 작성: deployer | 상태: 작성 완료 (Spark 워크스테이션 기준) | 최종 갱신: 2026-09-23
+> 이 문서의 절차는 2026-09-11 ~ 09-14, 09-23(PM2) 에 실제로 수행해 확인한 것이다.
 > 아직 외부 배포는 하지 않았다 — 내부망 워크스테이션 상시 기동이 현재 운영 형태다.
 
 ---
@@ -42,8 +42,33 @@ pnpm db:migrate
 
 ```bash
 pnpm install
-pnpm dev          # 개발. PORT(3010) + WS(3001) 를 함께 띄운다
+bash scripts/setup-pm2.sh install   # 상시 기동 — PM2 등록 + 저장 + 부팅 자동 기동
 ```
+
+상시 기동은 **PM2 로만 한다.** 앱은 `claudemanager` 한 프로세스이고, 내부적으로는
+`next dev` 가 앱과 WS 를 함께 띄운다 ([[📇 facts#포트]]).
+
+```bash
+pm2 status                       # 상태
+pm2 logs claudemanager           # 로그 (파일: ~/.claudemanager/logs/app-*.log)
+pm2 restart claudemanager        # 재시작 — 코드 반영 등
+```
+
+> **Claude Code 세션에서 `pnpm dev` 를 백그라운드 작업(`run_in_background`)으로
+> 띄우지 말 것.** 그 서버는 세션의 자식이라 세션이 끝날 때 함께 종료된다.
+> 2026-09-23 15:06 에 실제로 이렇게 내려갔고, 재시작이 잦아 백업 스케줄러
+> (기동 24시간 뒤 첫 실행)가 7일간 한 번도 돌지 못했다.
+> 포트를 이미 PM2 가 잡고 있으므로 `pnpm dev` 를 따로 띄우면 `EADDRINUSE` 가 난다.
+
+`scripts/pm2-start.sh` 가 기동 전에 **이전 인스턴스의 고아 프로세스를 치운다.**
+`next dev` 는 next-server 자식을 따로 띄우므로, 부모가 비정상 종료하면 고아가
+포트를 잡아 새 인스턴스가 `EADDRINUSE` 로 재시작만 반복한다. 작업 디렉터리가
+이 앱인 프로세스만 죽이므로 다른 서비스는 건드리지 않는다.
+
+부팅 자동 기동은 사용자 crontab `@reboot pm2 resurrect` 다. `pm2 startup` 은 sudo 가
+필요하고, 사용자 systemd 유닛은 linger 가 꺼져 있어 로그인 전에 뜨지 않는다.
+crontab 에 nvm 의 node 경로가 박혀 있으므로 **node 버전을 바꾸면
+`bash scripts/setup-pm2.sh boot` 를 다시 실행한다.**
 
 WebSocket 서버는 **Next 의 instrumentation 이 함께 기동한다.**
 `pnpm ws:dev` 를 따로 실행하면 WS 포트가 겹쳐 `EADDRINUSE` 가 난다 — 둘 중 하나만 띄운다.
@@ -135,6 +160,7 @@ bash .scripts/check-runtime.sh
 ## 6. 아직 하지 않은 것
 
 - 외부 배포 (도메인·TLS·리버스 프록시 없음, 내부망 전용)
-- 프로세스 관리자 상시 등록 — `ecosystem.config.js` · `scripts/setup-pm2.sh` 가 있으나
-  현재는 `pnpm dev` 로 띄워 둔 상태다
+- 실제 재부팅으로 자동 기동 확인 — `pm2 kill` 후 cron 과 같은 최소 환경에서
+  `pm2 resurrect` 로 복구되는 것까지만 확인했다. 부팅 시 DB 컨테이너는
+  `restart: unless-stopped` 로 뜬다
 - 프로덕션 빌드 기동(`pnpm build && pnpm start`) 검증 — 빌드 성공까지만 확인했다

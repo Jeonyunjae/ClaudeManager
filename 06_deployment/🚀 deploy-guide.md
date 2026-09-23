@@ -57,7 +57,7 @@ pm2 restart claudemanager        # 재시작 — 코드 반영 등
 > **Claude Code 세션에서 `pnpm dev` 를 백그라운드 작업(`run_in_background`)으로
 > 띄우지 말 것.** 그 서버는 세션의 자식이라 세션이 끝날 때 함께 종료된다.
 > 2026-09-23 15:06 에 실제로 이렇게 내려갔고, 재시작이 잦아 백업 스케줄러
-> (기동 24시간 뒤 첫 실행)가 7일간 한 번도 돌지 못했다.
+> (당시엔 기동 24시간 뒤 첫 실행)가 7일간 한 번도 돌지 못했다.
 > 포트를 이미 PM2 가 잡고 있으므로 `pnpm dev` 를 따로 띄우면 `EADDRINUSE` 가 난다.
 
 `scripts/pm2-start.sh` 가 기동 전에 **이전 인스턴스의 고아 프로세스를 치운다.**
@@ -116,6 +116,10 @@ allowedDevOrigins: ['192.168.30.24', 'spark-3f44', 'spark-3f44.local'],
 | `orchestrator-<timestamp>.tar.gz` | `.orchestrator/` 압축 |
 
 보존 개수는 `settings.backup_retention_count` (기본 7), 주기는 `backup_interval_hours` (기본 24).
+
+주기는 **마지막 백업 파일의 시각부터** 잰다. 기동 시점에 이미 밀려 있으면 1분 뒤
+바로 돈다 (부팅 직후 DB 컨테이너를 기다리는 여유). 재시작해도 백업 시계가 처음부터
+다시 돌지 않는다.
 
 > **덤프 방식이 두 가지다.** `pg_dump` 가 있으면 그것을 쓰고(스키마 포함),
 > 없으면 앱의 pg 커넥션으로 **데이터만** 덤프한다. 이 워크스테이션에는

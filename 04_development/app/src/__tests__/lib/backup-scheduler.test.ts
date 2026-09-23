@@ -6,6 +6,7 @@
  *   - pg_dump 이 없으면 pg 커넥션 폴백으로 덤프한다
  *   - 실패를 completed 로 기록하지 않는다
  *   - 스케줄러 시작/정지
+ *   - 첫 백업은 기동 시각이 아니라 마지막 백업 시각에서 주기를 잰다 (밀렸으면 곧바로)
  *
  * PostgreSQL 전환 반영: 예전 테스트는 "SQLite 파일 복사 + wal_checkpoint"를
  * 검증했다. 구현이 pg 덤프로 바뀌어 그 기대는 더 이상 성립하지 않는다.
@@ -157,17 +158,85 @@ describe('backup-scheduler.ts - 자동 백업', () => {
     });
   });
 
+  describe('msUntilFirstBackup', () => {
+    const HOUR = 60 * 60 * 1000;
+    const DAY = 24 * HOUR;
+    const MINUTE = 60 * 1000;
+
+    function writeDump(name: string, content: string, ageMs: number, now: number) {
+      const file = path.join(TEST_HOME, 'backups', name);
+      fs.writeFileSync(file, content);
+      const t = new Date(now - ageMs);
+      fs.utimesSync(file, t, t);
+    }
+
+    it('백업이 하나도 없으면 1분 뒤에 돈다', async () => {
+      const { msUntilFirstBackup } = await import('@/lib/backup-scheduler');
+      expect(msUntilFirstBackup(path.join(TEST_HOME, 'backups'), DAY)).toBe(MINUTE);
+    });
+
+    it('마지막 백업이 1시간 전이면 23시간 뒤에 돈다 (기동 시각에서 24시간이 아니다)', async () => {
+      const now = Date.now();
+      writeDump('db-recent.sql', '-- dump', HOUR, now);
+
+      const { msUntilFirstBackup } = await import('@/lib/backup-scheduler');
+      const wait = msUntilFirstBackup(path.join(TEST_HOME, 'backups'), DAY, now);
+      // 파일 mtime 은 ms 미만이 잘려 저장된다
+      expect(Math.abs(wait - 23 * HOUR)).toBeLessThan(1000);
+    });
+
+    it('주기를 넘겨 밀렸으면 1분 뒤에 돈다', async () => {
+      const now = Date.now();
+      writeDump('db-old.sql', '-- dump', 7 * DAY, now);
+
+      const { msUntilFirstBackup } = await import('@/lib/backup-scheduler');
+      expect(msUntilFirstBackup(path.join(TEST_HOME, 'backups'), DAY, now)).toBe(MINUTE);
+    });
+
+    it('0바이트 덤프는 백업으로 치지 않는다', async () => {
+      const now = Date.now();
+      writeDump('db-old.sql', '-- dump', 7 * DAY, now);
+      writeDump('db-empty.sql', '', HOUR, now);
+
+      const { msUntilFirstBackup } = await import('@/lib/backup-scheduler');
+      expect(msUntilFirstBackup(path.join(TEST_HOME, 'backups'), DAY, now)).toBe(MINUTE);
+    });
+  });
+
   describe('startBackupScheduler / stopBackupScheduler', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('스케줄러 시작 후 정지 가능', async () => {
       const { startBackupScheduler, stopBackupScheduler } = await import('@/lib/backup-scheduler');
-      startBackupScheduler();
+      await startBackupScheduler();
       stopBackupScheduler();
     });
 
     it('중복 시작 방지', async () => {
       const { startBackupScheduler, stopBackupScheduler } = await import('@/lib/backup-scheduler');
-      startBackupScheduler();
-      startBackupScheduler();
+      await startBackupScheduler();
+      await startBackupScheduler();
+      stopBackupScheduler();
+    });
+
+    it('밀린 백업은 기동 1분 뒤에 실행되고, 이후 주기대로 돈다', async () => {
+      vi.useFakeTimers();
+      h.execFileSync.mockReturnValue(Buffer.from('-- dump\n'));
+
+      const { startBackupScheduler, stopBackupScheduler } = await import('@/lib/backup-scheduler');
+      await startBackupScheduler();
+
+      const pgDumpCalls = () => h.execFileSync.mock.calls.filter((c) => c[0] === 'pg_dump').length;
+      expect(pgDumpCalls()).toBe(0);
+
+      await vi.advanceTimersByTimeAsync(60 * 1000);
+      expect(pgDumpCalls()).toBe(1);
+
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+      expect(pgDumpCalls()).toBe(2);
+
       stopBackupScheduler();
     });
   });

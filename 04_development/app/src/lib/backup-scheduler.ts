@@ -16,8 +16,11 @@ import { eq, desc } from 'drizzle-orm';
 
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const DEFAULT_MAX_BACKUPS = 7;
+/** 밀린 백업을 기동 직후 바로 돌리지 않고 기다리는 시간 — 부팅 중엔 DB 컨테이너가 아직 안 떴을 수 있다 */
+const CATCH_UP_DELAY_MS = 60 * 1000;
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
+let firstRunId: ReturnType<typeof setTimeout> | null = null;
 
 function getBackupDir(): string {
   const home = process.env.CLAUDEMANAGER_HOME || process.cwd();
@@ -262,16 +265,58 @@ async function cleanupOldBackups(): Promise<void> {
 }
 
 /**
+ * 마지막으로 성공한 백업 시각(ms). backups/ 의 비어 있지 않은 db-*.sql 중 가장 최근 mtime.
+ *
+ * DB 기록이 아니라 파일을 본다 — 0바이트 덤프가 completed 로 기록되던 버그가 있었고,
+ * DB 를 복구하는 상황이라면 기록은 없어도 파일은 남아 있다.
+ */
+function lastBackupAt(backupDir: string): number | null {
+  let latest: number | null = null;
+  for (const name of fs.readdirSync(backupDir)) {
+    if (!name.startsWith('db-') || !name.endsWith('.sql')) continue;
+    const stat = fs.statSync(path.join(backupDir, name));
+    if (stat.size > 0 && (latest === null || stat.mtimeMs > latest)) latest = stat.mtimeMs;
+  }
+  return latest;
+}
+
+/**
+ * 기동 후 첫 백업까지 기다릴 시간.
+ *
+ * 예전에는 setInterval 만 걸어 첫 백업이 항상 기동 24시간 뒤였다. 그 사이에
+ * 재시작하면 시계가 처음부터 다시 돌아, 재시작이 잦던 주에는 7일간 백업이
+ * 한 번도 돌지 않았다 (2026-09-16 ~ 09-23). 그래서 주기를 기동 시각이 아니라
+ * 마지막 백업 시각에서 잰다. 이미 밀렸으면 CATCH_UP_DELAY_MS 뒤에 돈다.
+ */
+export function msUntilFirstBackup(backupDir: string, intervalMs: number, now = Date.now()): number {
+  const last = lastBackupAt(backupDir);
+  if (last === null) return CATCH_UP_DELAY_MS;
+  return Math.max(CATCH_UP_DELAY_MS, last + intervalMs - now);
+}
+
+function runScheduledBackup(): void {
+  // 실패는 performBackup 이 기록한다. 기록조차 실패(DB 불통)해도 프로세스를 죽이지 않는다
+  performBackup().catch((err) => console.error('[backup] Scheduled run crashed:', err));
+}
+
+/**
  * Start the backup scheduler.
  */
 export async function startBackupScheduler(): Promise<void> {
-  if (intervalId) return;
+  if (intervalId || firstRunId) return;
 
   const intervalMs = await getBackupIntervalMs();
-  intervalId = setInterval(() => { performBackup(); }, intervalMs);
+  const firstDelayMs = msUntilFirstBackup(getBackupDir(), intervalMs);
+
+  firstRunId = setTimeout(() => {
+    firstRunId = null;
+    runScheduledBackup();
+    intervalId = setInterval(runScheduledBackup, intervalMs);
+  }, firstDelayMs);
 
   console.log(
-    `[backup] Scheduler started (interval: ${(intervalMs / 3600000).toFixed(1)}h)`
+    `[backup] Scheduler started (interval: ${(intervalMs / 3600000).toFixed(1)}h, ` +
+    `next: ${new Date(Date.now() + firstDelayMs).toISOString()})`
   );
 }
 
@@ -279,8 +324,10 @@ export async function startBackupScheduler(): Promise<void> {
  * Stop the backup scheduler.
  */
 export function stopBackupScheduler(): void {
-  if (intervalId) {
-    clearInterval(intervalId);
+  if (firstRunId || intervalId) {
+    if (firstRunId) clearTimeout(firstRunId);
+    if (intervalId) clearInterval(intervalId);
+    firstRunId = null;
     intervalId = null;
     console.log('[backup] Scheduler stopped');
   }

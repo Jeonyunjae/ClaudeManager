@@ -11,7 +11,9 @@ const mockFrom = vi.fn(() => ({ where: mockWhere }));
 const mockSelect = vi.fn(() => ({ from: mockFrom }));
 
 const mockUpdateWhere = vi.fn(() => Promise.resolve());
-const mockSet = vi.fn(() => ({ where: mockUpdateWhere }));
+const mockSet = vi.fn<(values: { value: string; updatedAt: string }) => { where: typeof mockUpdateWhere }>(
+  (_values) => ({ where: mockUpdateWhere })
+);
 const mockUpdate = vi.fn(() => ({ set: mockSet }));
 
 const mockInsertValues = vi.fn(() => Promise.resolve());

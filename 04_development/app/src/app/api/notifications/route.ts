@@ -40,9 +40,11 @@ export async function GET(request: NextRequest) {
       .where(eq(notifications.isRead, false))
       .limit(1);
 
+    // BUG-013: Postgres count(*)는 bigint를 반환하고 드라이버가 문자열로 매핑한다 —
+    // `sql<number>`은 타입 단언일 뿐 실제 캐스팅을 하지 않으므로 Number()로 명시 변환한다.
     // DF-005: unread=true로 부르면 total도 안 읽은 건수로 센다
-    const unreadCount = unreadResult?.count ?? 0;
-    const total = unreadOnly ? unreadCount : (totalResult?.count ?? 0);
+    const unreadCount = Number(unreadResult?.count ?? 0);
+    const total = unreadOnly ? unreadCount : Number(totalResult?.count ?? 0);
 
     return NextResponse.json({
       data: results,

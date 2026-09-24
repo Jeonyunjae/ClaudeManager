@@ -137,6 +137,37 @@ describe('GET /api/notifications (DF-005)', () => {
     const json = await res.json();
     expect(json.error.code).toBe('SYSTEM_ERROR');
   });
+
+  // BUG-013: Postgres count(*)는 bigint를 반환하고 드라이버가 이를 문자열로 매핑한다 —
+  // sql<number>는 타입 단언일 뿐이라 실제로는 total·unreadCount가 문자열("5")로 내려왔다.
+  it('count(*) 결과가 문자열(bigint 매핑)이어도 total·unreadCount는 숫자다 (BUG-013)', async () => {
+    const { GET } = await import('@/app/api/notifications/route');
+
+    queueRows([
+      {
+        id: 1,
+        type: 'info',
+        title: 'A',
+        message: 'm',
+        sourceAgentId: null,
+        targetUrl: '/m/notifications',
+        isRead: false,
+        createdAt: '2026-09-24T01:00:00.000Z',
+      },
+    ]); // results
+    queueRows([{ count: '5' }]); // totalResult — pg 드라이버가 bigint를 문자열로 내려주는 경우
+    queueRows([{ count: '2' }]); // unreadResult
+
+    const req = new NextRequest('http://localhost/api/notifications', { headers: authHeaders() });
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+
+    expect(json.pagination.total).toBe(5);
+    expect(typeof json.pagination.total).toBe('number');
+    expect(json.unreadCount).toBe(2);
+    expect(typeof json.unreadCount).toBe('number');
+  });
 });
 
 describe('POST /api/notifications/mark-read (DF-005)', () => {

@@ -9,10 +9,42 @@
 
 import { WS_PORT } from './constants';
 
-const WS_BROADCAST_URL = `http://localhost:${WS_PORT}/_broadcast`;
-const WS_CLI_EXECUTE_URL = `http://localhost:${WS_PORT}/_cli-execute`;
-const WS_CLI_CANCEL_URL = `http://localhost:${WS_PORT}/_cli-cancel`;
-const WS_QUEUE_CANCEL_URL = `http://localhost:${WS_PORT}/_queue-cancel`;
+/**
+ * 브리지가 실제로 붙을 WS 서버 포트를 정한다 (순수 함수 — BUG-001a).
+ *
+ * `process.env.WS_PORT`가 있으면(정수로 파싱 가능하면) 그 값을 최우선으로 쓴다 — 테스트
+ * 인스턴스(WS_PORT=3111)에서도 브리지가 같은 프로세스의 WS 서버로 가게 하기 위함이다
+ * (DF-013: 이 우선순위가 없어 항상 상수 3001로 나가 테스트 인스턴스 채팅이 무응답이었다).
+ * 없거나 파싱할 수 없으면 기존 상수 `WS_PORT`(3001)를 쓴다 — 운영은 `WS_PORT` 환경변수가
+ * 그대로 3001이므로 동작이 바뀌지 않는다.
+ */
+export function resolveBridgePort(envWsPort: string | undefined): number {
+  const parsed = envWsPort ? parseInt(envWsPort, 10) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : WS_PORT;
+}
+
+/** 브리지가 호출할 내부 HTTP 엔드포인트 URL들을 만든다 (순수 함수 — 테스트 용이). */
+export function buildBridgeUrls(port: number): {
+  broadcast: string;
+  cliExecute: string;
+  cliCancel: string;
+  queueCancel: string;
+} {
+  return {
+    broadcast: `http://localhost:${port}/_broadcast`,
+    cliExecute: `http://localhost:${port}/_cli-execute`,
+    cliCancel: `http://localhost:${port}/_cli-cancel`,
+    queueCancel: `http://localhost:${port}/_queue-cancel`,
+  };
+}
+
+const BRIDGE_PORT = resolveBridgePort(process.env.WS_PORT);
+const {
+  broadcast: WS_BROADCAST_URL,
+  cliExecute: WS_CLI_EXECUTE_URL,
+  cliCancel: WS_CLI_CANCEL_URL,
+  queueCancel: WS_QUEUE_CANCEL_URL,
+} = buildBridgeUrls(BRIDGE_PORT);
 const BROADCAST_SECRET = process.env.WS_BROADCAST_SECRET || 'claudemanager-ws-internal';
 
 /**

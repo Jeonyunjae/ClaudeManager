@@ -10,6 +10,8 @@ type BuildWsUrlParams = {
   hostname: string;
   token: string;
   wssPort: string | undefined;
+  /** HTTP(비-HTTPS) 접속일 때 쓸 포트 — `NEXT_PUBLIC_WS_PORT` (BUG-001b). 없으면 기존 `WS_PORT`(3001). */
+  wsPort?: string;
 };
 
 /**
@@ -17,12 +19,14 @@ type BuildWsUrlParams = {
  *
  * HTTPS 페이지이고 NEXT_PUBLIC_WSS_PORT가 있으면 그 포트로 wss 접속한다
  * (Tailscale serve가 HTTPS를 종단하고 다른 포트로 프록시하는 구성, INT-001).
- * 그 외(HTTP이거나 포트 미설정)에는 기존과 동일하게 `WS_PORT`(3001)를 쓴다.
+ * HTTP 페이지면 `NEXT_PUBLIC_WS_PORT`가 있을 때 그 포트를 쓴다(BUG-001b — 테스트 인스턴스처럼
+ * WS 서버가 3001이 아닌 포트로 뜬 경우). 그 외(HTTPS인데 wssPort 미설정, 또는 wsPort 미설정)에는
+ * 기존과 동일하게 `WS_PORT`(3001)를 쓴다 — 운영은 동작이 바뀌지 않는다.
  */
-export function buildWsUrl({ protocol, hostname, token, wssPort }: BuildWsUrlParams): string {
+export function buildWsUrl({ protocol, hostname, token, wssPort, wsPort }: BuildWsUrlParams): string {
   const useWss = protocol === 'https:' && !!wssPort;
   const scheme = useWss ? 'wss:' : protocol === 'https:' ? 'wss:' : 'ws:';
-  const port = useWss ? wssPort : WS_PORT;
+  const port = useWss ? wssPort : protocol === 'https:' ? WS_PORT : wsPort || WS_PORT;
   return `${scheme}//${hostname}:${port}/ws?token=${token}`;
 }
 
@@ -48,6 +52,7 @@ class WebSocketClient {
       hostname: window.location.hostname,
       token: this.token ?? '',
       wssPort: process.env.NEXT_PUBLIC_WSS_PORT,
+      wsPort: process.env.NEXT_PUBLIC_WS_PORT,
     });
 
     try {

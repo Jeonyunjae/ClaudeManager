@@ -26,7 +26,42 @@ import {
   broadcastNotification,
   broadcastCostUpdated,
   broadcastLogNew,
+  resolveBridgePort,
+  buildBridgeUrls,
 } from '@/lib/ws-bridge';
+
+// --- AC: BUG-001a — 브리지 포트 결정·URL 생성 (순수 함수) ---
+describe('resolveBridgePort (BUG-001a)', () => {
+  it('process.env.WS_PORT가 정수 문자열이면 그 값을 쓴다 (테스트 인스턴스 3111)', () => {
+    expect(resolveBridgePort('3111')).toBe(3111);
+  });
+
+  it('WS_PORT가 없으면 상수 3001로 폴백한다 (운영 동작 유지)', () => {
+    expect(resolveBridgePort(undefined)).toBe(3001);
+  });
+
+  it('WS_PORT가 파싱 불가능한 값이면 3001로 폴백한다', () => {
+    expect(resolveBridgePort('not-a-port')).toBe(3001);
+    expect(resolveBridgePort('')).toBe(3001);
+    expect(resolveBridgePort('0')).toBe(3001);
+    expect(resolveBridgePort('-1')).toBe(3001);
+  });
+
+  it('운영과 동일한 값(3001)을 넣어도 3001을 반환한다 (운영 무변경)', () => {
+    expect(resolveBridgePort('3001')).toBe(3001);
+  });
+});
+
+describe('buildBridgeUrls (BUG-001a)', () => {
+  it('주어진 포트로 4개의 내부 엔드포인트 URL을 만든다', () => {
+    expect(buildBridgeUrls(3111)).toEqual({
+      broadcast: 'http://localhost:3111/_broadcast',
+      cliExecute: 'http://localhost:3111/_cli-execute',
+      cliCancel: 'http://localhost:3111/_cli-cancel',
+      queueCancel: 'http://localhost:3111/_queue-cancel',
+    });
+  });
+});
 
 describe('ws-bridge.ts - WebSocket 브로드캐스트 브릿지', () => {
   beforeEach(() => {

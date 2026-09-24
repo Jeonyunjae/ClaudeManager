@@ -263,6 +263,18 @@ export const useMobileChatStore = create<MobileChatState>((set, get) => ({
       const agentId = message.agentId;
       const current = getOrInit(state.byAgent, agentId);
 
+      // BUG-008: 재연결 시 REST 재조회(load/loadMore)와 WS chat:message 수신이 겹치면
+      // 같은 id의 메시지가 두 번 들어올 수 있다 — 이미 반영된 id면 버블을 새로 추가하지
+      // 않는다(스트리밍/타이핑 상태만 정리한다).
+      if (current.messages.some((m) => m.id === message.id)) {
+        return {
+          byAgent: {
+            ...state.byAgent,
+            [agentId]: { ...current, streaming: null, typing: false },
+          },
+        };
+      }
+
       if (message.sender === 'user') {
         const tempIndex = current.messages.findIndex(
           (m) => m.type === 'instruction' && m.id.startsWith('temp-') && !m.failed && m.content === message.content

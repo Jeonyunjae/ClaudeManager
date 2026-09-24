@@ -227,5 +227,42 @@ describe('mobileChatStore', () => {
       expect(s.messages).toHaveLength(1);
       expect(s.messages[0].id).toBe('real-user-msg-1');
     });
+
+    // BUG-008: 재연결 REST 재조회와 WS 수신이 겹치는 경우를 흉내낸다 — 같은 id가 두 번 온다.
+    it('같은 id의 에이전트 응답이 두 번 오면 버블을 중복 추가하지 않는다 (BUG-008)', async () => {
+      const { useMobileChatStore } = await import('@/stores/mobileChatStore');
+      const msg = {
+        id: 'r1',
+        sender: 'sub-1',
+        content: '완료했습니다',
+        messageType: 'text',
+        agentId: 'a1',
+        createdAt: '2026-09-24T03:00:00.000Z',
+      };
+
+      useMobileChatStore.getState().applyMessage(msg);
+      useMobileChatStore.getState().applyMessage(msg); // 중복 수신
+
+      const s = useMobileChatStore.getState().getAgentState('a1');
+      expect(s.messages).toHaveLength(1);
+    });
+
+    it('같은 id의 사용자 메시지가 두 번 오면(재조회+WS) 버블을 중복 추가하지 않는다 (BUG-008)', async () => {
+      const { useMobileChatStore } = await import('@/stores/mobileChatStore');
+      const msg = {
+        id: 'real-user-msg-2',
+        sender: 'user',
+        content: '중복 방지 확인',
+        messageType: 'text',
+        agentId: 'a1',
+        createdAt: '2026-09-24T03:00:00.000Z',
+      };
+
+      useMobileChatStore.getState().applyMessage(msg);
+      useMobileChatStore.getState().applyMessage(msg);
+
+      const s = useMobileChatStore.getState().getAgentState('a1');
+      expect(s.messages).toHaveLength(1);
+    });
   });
 });

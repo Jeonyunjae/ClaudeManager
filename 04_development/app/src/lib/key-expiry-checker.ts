@@ -7,7 +7,7 @@
 import db from './db';
 import { apiKeys, notifications } from './schema';
 import { and, lte, eq, not } from 'drizzle-orm';
-import { broadcastNotification } from './ws-bridge';
+import { createNotification } from './notify';
 
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const WARNING_DAYS = 7;
@@ -44,14 +44,11 @@ export async function checkKeyExpiry(): Promise<void> {
         .set({ status: 'expired', updatedAt: nowStr })
         .where(eq(apiKeys.id, key.id));
 
-      const notif = {
+      await createNotification({
         type: 'warning',
         title: 'API Key Expired',
         message: `API key for ${key.provider} (${key.keyMasked}) has expired.`,
-      };
-
-      await db.insert(notifications).values(notif);
-      broadcastNotification(notif);
+      });
     }
 
     // 2. Find keys expiring within WARNING_DAYS
@@ -79,14 +76,11 @@ export async function checkKeyExpiry(): Promise<void> {
         (new Date(key.expiresAt!).getTime() - now.getTime()) / (24 * 60 * 60 * 1000)
       );
 
-      const notif = {
+      await createNotification({
         type: 'key_expiry_warning',
         title: 'API Key Expiring Soon',
         message: `API key for ${key.provider} (${key.keyMasked}) expires in ${daysLeft} day(s).`,
-      };
-
-      await db.insert(notifications).values(notif);
-      broadcastNotification(notif);
+      });
     }
 
     console.log(

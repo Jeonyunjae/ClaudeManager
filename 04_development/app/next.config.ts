@@ -5,7 +5,6 @@ const nextConfig: NextConfig = {
   // 접속해 쓴다. Next dev는 LAN IP로 들어온 /_next/* 요청을 기본 차단하는데,
   // 그러면 HTML만 오고 하이드레이션이 되지 않아 모든 입력·버튼이 죽는다.
   // 100.110.241.84 는 이 호스트의 Tailscale 주소 — 랜 밖에서 들어올 때 쓴다.
-  // spark-3f44.tailed65d5.ts.net 은 tailscale serve(HTTPS :8444)로 들어올 때의 MagicDNS 이름.
   allowedDevOrigins: ['192.168.30.24', 'spark-3f44', 'spark-3f44.local', '100.110.241.84', 'spark-3f44.tailed65d5.ts.net'],
 };
 

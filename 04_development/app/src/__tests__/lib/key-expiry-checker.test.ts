@@ -9,16 +9,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock ws-bridge
+// lib/notify.ts(신규)가 기본 방송 수단으로 `wsBroadcast`를 쓴다 (RISK-01,
+// DES-001 §Backend). key-expiry-checker.ts는 더 이상 broadcastNotification을
+// 직접 부르지 않고 createNotification()을 거치므로, 여기서도 wsBroadcast를
+// 검증 대상으로 바꾼다.
 vi.mock('@/lib/ws-bridge', () => ({
   broadcastNotification: vi.fn(),
+  wsBroadcast: vi.fn(() => Promise.resolve()),
 }));
 
 // Mock DB
 // PostgreSQL 전환 반영: 구현이 동기 `.all()`/`.run()`(better-sqlite3) 에서
 // await 가능한 drizzle 빌더로 바뀌었다. select 는 "await 하면 행 배열을 주는
 // 체인"으로, insert/update 는 Promise 로 맞춘다.
+// lib/notify.ts가 `insert().values().returning()`을 쓰므로 values()의 반환값도
+// `.returning()`을 갖춘 체인으로 맞춘다 (그대로 await 해도 되는 thenable).
 const mockRun = vi.fn();
-const mockInsertValues = vi.fn((_values: Record<string, unknown>) => { mockRun(); return Promise.resolve(); });
+const mockReturning = vi.fn(() => Promise.resolve([{ id: 1, createdAt: '2026-09-24T00:00:00.000Z' }]));
+const mockInsertValues = vi.fn((_values: Record<string, unknown>) => {
+  mockRun();
+  return {
+    returning: mockReturning,
+    then: (resolve: (v: unknown) => void) => Promise.resolve().then(resolve),
+  };
+});
 const mockInsert = vi.fn().mockReturnValue({ values: mockInsertValues });
 
 const mockUpdateWhere = vi.fn(() => { mockRun(); return Promise.resolve(); });
@@ -61,7 +75,7 @@ vi.mock('drizzle-orm', async (importOriginal) => {
 });
 
 import { checkKeyExpiry, startKeyExpiryChecker, stopKeyExpiryChecker } from '@/lib/key-expiry-checker';
-import { broadcastNotification } from '@/lib/ws-bridge';
+import { wsBroadcast } from '@/lib/ws-bridge';
 
 describe('key-expiry-checker.ts - 키 만료 체크', () => {
   beforeEach(() => {
@@ -123,8 +137,11 @@ describe('key-expiry-checker.ts - 키 만료 체크', () => {
       expect(notifValues.message).toContain('anthropic');
       expect(notifValues.message).toContain('sk-...abc');
 
-      // Should broadcast
-      expect(broadcastNotification).toHaveBeenCalled();
+      // Should broadcast — lib/notify.ts는 기본으로 wsBroadcast를 쓴다
+      expect(wsBroadcast).toHaveBeenCalledWith(
+        'notification:new',
+        expect.objectContaining({ notification: expect.objectContaining({ type: 'warning' }) })
+      );
     });
   });
 

@@ -1,22 +1,32 @@
 {
+  "id": "/m/chat",
   "name": "ClaudeManager",
   "short_name": "CM",
   "description": "AI Agent Orchestration Manager",
-  "start_url": "/",
+  "start_url": "/m/chat",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#6366f1",
   "orientation": "any",
   "icons": [
     {
-      "src": "/assets/icon-192.png",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/assets/icon-512.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "categories": ["productivity", "utilities"]

@@ -1,0 +1,71 @@
+/**
+ * PM2 설정 — 테스트 인스턴스(claudemanager-mtest) 상시 기동용.
+ *
+ * 운영(`ecosystem.config.js`)과 같은 구조를 그대로 따른다. 다른 점은 앱 이름과
+ * 로그 파일 경로뿐이다 — 포트·DB·CM_BACKGROUND_JOBS 등은 이 파일이 아니라
+ * 이 앱의 작업 사본(별도 경로)에 있는 `.env.local`이 정한다
+ * (DES-001 §테스트 인스턴스 구성, DES-009 §환경 변수).
+ *
+ * 왜 결국 같은 `scripts/pm2-start.sh`로 이어지는가: `scripts/mtest-start.sh`
+ * (아래 `script`)가 안전 검증 후 그 스크립트를 실행한다. `pm2-start.sh`는
+ * 실행 시점의 cwd에서 `.env.local`을 읽어 PORT/WS_PORT를 얻는다(운영과 같은
+ * 스크립트를 그대로 복사해도 각자의 `.env.local`을 보고 각자의 포트로 뜬다).
+ * 포트를 잡은 프로세스를 정리할 때도 "작업 디렉터리가 이 앱일 때만" 죽이므로,
+ * 운영 앱(다른 경로에서 기동)과는 절대 겹치지 않는다.
+ *
+ * 앱 이름은 `claudemanager-mtest`로 운영(`claudemanager`)과 다르게 둔다 — pm2가
+ * 이름으로 구분하므로 `pm2 restart claudemanager`가 이 앱을 건드릴 일이 없다.
+ *
+ * 로그는 운영과 겹치지 않게 파일명에 `mtest-` 접두사를 붙이고, 운영과 같은
+ * `~/.claudemanager/logs/` 아래에 둔다(홈 디렉터리 고정 — 테스트 인스턴스의
+ * `CLAUDEMANAGER_HOME=/tmp/cm-mtest`와는 무관하다. 그건 앱이 스킬·오케스트레이터
+ * 데이터를 두는 곳이고, pm2 로그는 항상 사람이 보는 홈 디렉터리에 남긴다).
+ *
+ * 사용:
+ *   pm2 start ecosystem.mtest.config.js && pm2 save
+ *   pm2 status | pm2 logs claudemanager-mtest | pm2 restart claudemanager-mtest
+ *
+ * DF-008 (2026-09-24): 운영 next-server의 자식 셸에서 위 `pm2 start`를
+ * 실행했더니, 그 셸이 상속한 운영 env(DATABASE_URL·JWT_SECRET·WS_PORT·
+ * PORT·`__NEXT_PROCESSED_ENV` 등)를 pm2 CLI가 이 앱에 그대로 넘겼다. Next는
+ * 이미 있는 env를 `.env.local`로 덮지 않고 `__NEXT_PROCESSED_ENV`가 있으면
+ * env 파일 로딩 자체를 건너뛰므로, `CM_BACKGROUND_JOBS=off`도 무시된 채
+ * 테스트 인스턴스가 운영 DB에 붙었다. 대응 두 겹:
+ *   1) `filter_env: true` — pm2 CLI를 부른 셸의 env를 애초에 앱에 넘기지
+ *      않는다(pm2 자체 옵션).
+ *   2) `script`를 `scripts/mtest-start.sh`로 바꿔, 혹시 위 방어가 뚫려도
+ *      `.env.local` 안전 검증(DB 이름=claudemanager_mtest 등, DF-008) 후
+ *      `env -i`로 깨끗한 환경에서 `pm2-start.sh`를 실행하게 했다.
+ */
+
+// pm2가 이 파일을 CommonJS로 읽는다 (package.json에 "type": "module"이 없다) —
+// ecosystem.config.js와 같은 이유로 require를 그대로 쓴다.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const path = require('path');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const os = require('os');
+
+const LOG_DIR = path.join(os.homedir(), '.claudemanager', 'logs');
+
+module.exports = {
+  apps: [
+    {
+      name: 'claudemanager-mtest',
+      script: 'scripts/mtest-start.sh',
+      interpreter: 'bash',
+      cwd: __dirname,
+      // pm2 CLI를 부른 셸의 env를 이 앱에 넘기지 않는다 (DF-008).
+      filter_env: true,
+      autorestart: true,
+      restart_delay: 5000,
+      max_restarts: 10,
+      min_uptime: '30s',
+      kill_timeout: 10000,
+      watch: false,
+      out_file: path.join(LOG_DIR, 'mtest-out.log'),
+      error_file: path.join(LOG_DIR, 'mtest-error.log'),
+      merge_logs: true,
+      time: true,
+    },
+  ],
+};

@@ -10,9 +10,10 @@ import { eq } from 'drizzle-orm';
 import fs from 'fs';
 import path from 'path';
 import db from '../lib/db';
-import { chatMessages, agents, parts, costRecords, auditLogs, notifications } from '../lib/schema';
+import { chatMessages, agents, parts, costRecords, auditLogs } from '../lib/schema';
 import { agentManager } from '../lib/agent-manager';
 import { loadMainSkill, parseActions } from '../lib/skill-loader';
+import { createNotification } from '../lib/notify';
 import { broadcast } from './ws-server';
 
 function ts() {
@@ -250,24 +251,20 @@ export async function processChatInBackground(req: CliExecutionRequest): Promise
       createdAt: new Date().toISOString(),
     });
 
-    // Notification
+    // Notification (lib/notify.ts -- insert -> notification:new broadcast -> push fire-and-forget)
     const preview = responseText.length > 80
       ? responseText.substring(0, 80) + '\u2026'
       : responseText;
-    const [notifResult] = await db.insert(notifications).values({
-      type: 'info',
-      title: `${agentName} 응답 완료`,
-      message: preview,
-      sourceAgentId: agentId,
-    }).returning({ id: notifications.id });
-    broadcast('notification:new', {
-      notification: {
-        id: notifResult.id,
-        type: 'info',
-        title: `${agentName} 응답 완료`,
-        message: preview,
-      },
-    });
+    // BUG-012: 알림 생성 실패가 방금 저장·방송한 성공 응답을 error로 바꾸면 안 된다 —
+    // 이 호출만 별도 try/catch로 감싸 실패해도 로그만 남기고 흐름을 끝낸다.
+    try {
+      await createNotification(
+        { type: 'info', title: `${agentName} 응답 완료`, message: preview, sourceAgentId: agentId },
+        { broadcast }
+      );
+    } catch (notifyErr) {
+      console.error(`[${ts()}] [CLI] ⚠ ${agentName} — 알림 생성 실패(응답은 성공으로 유지):`, notifyErr);
+    }
 
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -297,21 +294,16 @@ export async function processChatInBackground(req: CliExecutionRequest): Promise
       createdAt: new Date().toISOString(),
     });
 
-    // Error notification
-    const [errNotif] = await db.insert(notifications).values({
-      type: 'error',
-      title: `${agentName} 응답 오류`,
-      message: errorMsg.length > 80 ? errorMsg.substring(0, 80) + '\u2026' : errorMsg,
-      sourceAgentId: agentId,
-    }).returning({ id: notifications.id });
-    broadcast('notification:new', {
-      notification: {
-        id: errNotif.id,
+    // Error notification (lib/notify.ts)
+    await createNotification(
+      {
         type: 'error',
         title: `${agentName} 응답 오류`,
         message: errorMsg.length > 80 ? errorMsg.substring(0, 80) + '\u2026' : errorMsg,
+        sourceAgentId: agentId,
       },
-    });
+      { broadcast }
+    );
   }
 }
 

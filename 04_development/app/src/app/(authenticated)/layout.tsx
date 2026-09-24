@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useViewMode } from '@/hooks/useViewMode';
 import { useAgentStore } from '@/stores/agentStore';
 import { usePartStore } from '@/stores/partStore';
 import { useApprovalStore } from '@/stores/approvalStore';
@@ -18,7 +20,9 @@ export default function AuthenticatedLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
+  const { shouldUseMobile } = useViewMode();
   useWebSocket();
 
   const { fetchTree, initMain, initialized } = useAgentStore();
@@ -38,7 +42,15 @@ export default function AuthenticatedLayout({
     }
   }, [isAuthenticated, initMain, fetchTree, fetchParts, fetchPending, fetchNotifications, fetchHealth]);
 
-  if (isLoading || !isAuthenticated) {
+  useEffect(() => {
+    // FR-001: 폭<768(ForcedDesktop이 아닌 한)이면 모바일 셸로 보낸다.
+    // 폭≥768(데스크톱)은 이 훅이 false를 주므로 기존 동작과 완전히 동일하다.
+    if (isAuthenticated && shouldUseMobile) {
+      router.replace('/m/chat');
+    }
+  }, [isAuthenticated, shouldUseMobile, router]);
+
+  if (isLoading || !isAuthenticated || shouldUseMobile) {
     return null;
   }
 

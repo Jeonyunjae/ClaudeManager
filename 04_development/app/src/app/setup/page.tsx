@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
+import { useViewMode } from '@/hooks/useViewMode';
 
 function getPasswordStrength(pw: string): { level: number; text: string; hint: string } {
   if (!pw) return { level: 0, text: '', hint: '' };
@@ -34,14 +35,17 @@ function getStrengthTextColor(level: number): string {
 export default function SetupPage() {
   const router = useRouter();
   const { setup, isAuthenticated, isLoading, error } = useAuthStore();
+  const { shouldUseMobile } = useViewMode();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/workspace');
+      // DF-006: /workspace(폐기된 Phase 2 3D 화면)로 가지 않는다.
+      // 폭<768이면 /m/chat, 아니면 기존 /dashboard.
+      router.replace(shouldUseMobile ? '/m/chat' : '/dashboard');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, shouldUseMobile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +68,8 @@ export default function SetupPage() {
       position: 'relative',
       overflow: 'hidden',
       fontSize: '13px',
+      padding: '0 16px',
+      boxSizing: 'border-box',
     }}>
       {/* bg-pattern */}
       <div style={{
@@ -80,7 +86,7 @@ export default function SetupPage() {
       {/* Setup Card */}
       <div style={{
         position: 'relative', zIndex: 1,
-        width: 420, background: 'var(--bg-card)',
+        width: '100%', maxWidth: 420, background: 'var(--bg-card)',
         borderRadius: 24, boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
         padding: '48px 40px',
       }}>

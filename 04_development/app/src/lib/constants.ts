@@ -8,6 +8,8 @@ export const JWT_EXPIRY_DAYS = 7;
 export const PASSWORD_SALT_ROUNDS = 12;
 export const MAX_LOGIN_ATTEMPTS = 5;
 export const LOCKOUT_DURATION_SECONDS = 30;
+// 토큰 만료까지 남은 기간이 이 값(일) 이하이면 앱 진입 시 자동 갱신한다 (NFR-003)
+export const TOKEN_REFRESH_THRESHOLD_DAYS = 2;
 
 // WebSocket
 export const WS_PORT = 3001;

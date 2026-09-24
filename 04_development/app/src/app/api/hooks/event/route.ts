@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import db from '@/lib/db';
-import { agentLogs, notifications, chatMessages, agents } from '@/lib/schema';
+import { agentLogs, chatMessages, agents } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import {
   broadcastAgentStatus,
   broadcastChatMessage,
-  broadcastNotification,
   broadcastLogNew,
 } from '@/lib/ws-bridge';
+import { createNotification } from '@/lib/notify';
 import { logError } from '@/lib/error-logger';
 import { writeNoteFile } from '@/lib/note-writer';
 
@@ -83,18 +83,12 @@ export async function POST(request: NextRequest) {
 
         broadcastAgentStatus(agentId, 'error', data?.message || 'Error occurred');
 
-        // Create error notification
-        await db.insert(notifications).values({
+        // Create error notification (lib/notify.ts)
+        await createNotification({
           type: 'error',
           title: 'Agent Error',
           message: data?.message || `Agent ${agentId} encountered an error.`,
           sourceAgentId: agentId,
-        });
-
-        broadcastNotification({
-          type: 'error',
-          title: 'Agent Error',
-          message: data?.message || `Agent ${agentId} encountered an error.`,
         });
         break;
 

@@ -3,6 +3,8 @@
 import { create } from 'zustand';
 import apiClient from '@/lib/api';
 import wsClient from '@/lib/ws';
+import { decodeJwtExp, getRemainingDays } from '@/lib/jwt-exp';
+import { TOKEN_REFRESH_THRESHOLD_DAYS } from '@/lib/constants';
 
 type AuthState = {
   token: string | null;
@@ -77,11 +79,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   checkAuth: () => {
     if (typeof window === 'undefined') return;
     const token = localStorage.getItem('auth_token');
-    if (token) {
-      wsClient.connect(token);
-      set({ token, isAuthenticated: true, hasCheckedAuth: true });
+    if (!token) {
+      set({ hasCheckedAuth: true });
       return;
     }
-    set({ hasCheckedAuth: true });
+
+    // 서명 검증 없이 exp만 본다 — 만료 여부/임박 여부 판단용 (NFR-003).
+    // 디코드 실패(형식이 아니거나 exp 없음)는 기존 동작(그대로 인증 처리)을 유지한다.
+    const exp = decodeJwtExp(token);
+
+    if (exp !== null && getRemainingDays(exp) < 0) {
+      // 이미 만료됨 — 토큰 삭제, 미인증 처리
+      apiClient.clearToken();
+      set({ token: null, isAuthenticated: false, hasCheckedAuth: true });
+      return;
+    }
+
+    wsClient.connect(token);
+    set({ token, isAuthenticated: true, hasCheckedAuth: true });
+
+    if (exp !== null && getRemainingDays(exp) <= TOKEN_REFRESH_THRESHOLD_DAYS) {
+      void refreshTokenIfNearExpiry(set);
+    }
   },
 }));
+
+/**
+ * 만료 임박(≤ TOKEN_REFRESH_THRESHOLD_DAYS) 시 새 토큰을 받아 교체한다 (NFR-003).
+ * 실패하면 기존 토큰을 그대로 두고 다음 앱 진입에서 재시도한다.
+ */
+async function refreshTokenIfNearExpiry(set: (partial: Partial<AuthState>) => void): Promise<void> {
+  try {
+    const res = await apiClient.post<{ token: string }>('/api/auth/refresh');
+    const newToken = res.data.token;
+    apiClient.setToken(newToken);
+    wsClient.connect(newToken);
+    set({ token: newToken });
+  } catch {
+    // 실패 시 기존 토큰 유지 — 다음 진입에서 재시도
+  }
+}

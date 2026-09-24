@@ -15,6 +15,7 @@ export async function register() {
     const { startKeyExpiryChecker } = await import('@/lib/key-expiry-checker');
     const { startReportScheduler, setReportSchedulerBroadcast, setReportSchedulerCliHandler } = await import('@/lib/report-scheduler');
     const { WS_PORT } = await import('@/lib/constants');
+    const { backgroundJobsEnabled } = await import('@/lib/background-jobs');
 
     // Terminal -> WS broadcast
     setOnDataHandler((sessionId, data) => {
@@ -77,16 +78,7 @@ export async function register() {
     const port = parseInt(process.env.WS_PORT || String(WS_PORT), 10);
     createWSServer(port);
 
-    // Auxiliary services
-    setWatcherBroadcast(broadcast);
-    startFileWatcher().catch((err) => console.warn('[Boot] File watcher failed:', err));
-    startBackupScheduler();
-    startKeyExpiryChecker();
-    setReportSchedulerBroadcast(broadcast);
-    setReportSchedulerCliHandler(processChatInBackground);
-    startReportScheduler();
-
-    // --- Agent Manager setup ---
+    // --- Agent Manager setup (WS 핸들러와 함께 항상 켜져 있다 — CM_BACKGROUND_JOBS와 무관) ---
     agentManager.setSessionPersister(async (agentId, sessionId) => {
       await db.update(agents)
         .set({ cliSessionId: sessionId, updatedAt: new Date().toISOString() })
@@ -97,6 +89,22 @@ export async function register() {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId)).limit(1);
       return { sessionId: agent?.cliSessionId || null, projectRoot: agent?.projectRoot || null };
     });
+
+    if (!backgroundJobsEnabled(process.env)) {
+      // 테스트 인스턴스(claudemanager-mtest): 백업·리포트·키 만료·Main 재개·파일 감시를
+      // 건너뛴다. 운영 DB에 쓰지 않기 위함이다 (NFR-002).
+      console.log('[Boot] CM_BACKGROUND_JOBS=off — 기동 작업(파일 감시·백업·키 만료·리포트·Main 재개)을 건너뛴다.');
+      return;
+    }
+
+    // Auxiliary services
+    setWatcherBroadcast(broadcast);
+    startFileWatcher().catch((err) => console.warn('[Boot] File watcher failed:', err));
+    startBackupScheduler();
+    startKeyExpiryChecker();
+    setReportSchedulerBroadcast(broadcast);
+    setReportSchedulerCliHandler(processChatInBackground);
+    startReportScheduler();
 
     const [mainAgent] = await db
       .select()

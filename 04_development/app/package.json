@@ -13,7 +13,8 @@
     "ws:dev": "tsx --env-file=.env.local src/server/start-ws.ts",
     "ws:build": "tsc --project tsconfig.ws.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -41,6 +42,7 @@
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0",
     "uuid": "^13.0.0",
+    "web-push": "^3.6.7",
     "ws": "^8.20.0",
     "xterm": "^5.3.0",
     "zustand": "^5.0.12"
@@ -55,7 +57,9 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^11.0.0",
+    "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "4.1.4",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",

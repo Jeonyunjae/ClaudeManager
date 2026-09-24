@@ -111,6 +111,14 @@ export function useWebSocket(): void {
       })
     );
 
+    // 다른 기기에서 읽음 처리된 알림 반영 — 배지 재계산 (EVT-M03-9)
+    unsubscribers.push(
+      wsClient.on('notification:read', (payload) => {
+        const data = payload as { ids: (number | string)[] | 'all' };
+        useNotificationStore.getState().applyRead(data.ids);
+      })
+    );
+
     // Cost events
     unsubscribers.push(
       wsClient.on('cost:updated', (payload) => {

@@ -1,0 +1,40 @@
+# Changelog
+
+이 파일은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 형식을 따른다.
+요구사항 코드(`FR-`·`NFR-`·`INT-`·`UIR-`)와 결함 코드(`DF-`)를 각 항목에 괄호로 병기한다.
+
+## [Unreleased] - 모바일 웹 Phase 1 (`feat/mobile-web`)
+
+### Added
+- 폭 판정 기반 모바일 자동 전환 + 데스크톱 보기 수동 전환·복귀 (FR-001, FR-002, UIR-001)
+- 로그인 성공 시 `next` 파라미터(같은 출처 상대 경로만)로 원래 화면 복귀 — Open Redirect 방지
+- `/m` 공통 셸: 인증 가드, WS 연결, 진입 시 inbox·notifications·tree 조회 (공통 EVT-SH-3)
+- SCR-M01 대화 목록 + 답변 대기 인박스(확인함 처리 포함) (FR-006, FR-007)
+- SCR-M02 대화 화면: 메시지 목록·전송·재전송·스트리밍·대기열·이전 대화 무한 스크롤, 실시간 스토어(`mobileChatStore`)·WS 반영 (FR-004, FR-005, FR-007)
+- SCR-M03 알림 목록: 읽음·모두 읽음 처리, 무한 스크롤, 탭 시 해당 화면 이동 (FR-009, FR-013)
+- SCR-M04 상태 화면: Part·Sub·Instance 트리 상태 카드, 실시간 반영, 데스크톱 상세 보기 이동 (FR-014, FR-015, FR-002)
+- 웹 푸시 구독 켜기/끄기, VAPID 키 조회, 서비스워커 알림 클릭 시 해당 화면 이동 (FR-010, FR-011, FR-012, FR-013)
+- 알림 생성 공통 함수 `createNotification`(insert → WS 방송 → 푸시 fire-and-forget) 도입
+- iPhone 홈 화면 설치 지원(PWA manifest·아이콘·설치 안내 배너) (FR-003)
+- 로그인 만료 임박(≤2일) 토큰 자동 갱신 + 401 응답 시 토큰 삭제·로그인 화면 이동 (NFR-003)
+- HTTPS(Tailscale serve) 접속 경로에서 `NEXT_PUBLIC_WSS_PORT`로 별도 포트 wss 접속 지원 (INT-001)
+- 테스트 인스턴스(`claudemanager-mtest`) PM2 설정·DB 준비 스크립트, `CM_BACKGROUND_JOBS=off`로 기동 작업 분리해 운영과 격리 (NFR-002)
+- WS `connection:open` 재연결 전이 감지 + 화면별 재조회(목록: inbox·tree / 대화: conversations 1페이지), 앱이 백그라운드에서 돌아올 때(`visibilitychange`) 연결 상태 확인 후 재연결 시도 (FR-005, DES-006 EVT-SH-1·EVT-SH-2)
+- `apiClient.del(path, body?)` — DELETE 요청에 JSON 바디를 실어 보낼 수 있도록 확장 (기존 바디 없는 호출부와 호환) (DF-012)
+- `CHANGELOG.md` 신설 (Keep a Changelog 형식)
+
+### Changed
+- `mobileChatStore.send`가 `Promise<boolean>`을 반환하도록 확장해, 전송 실패 시 호출부가 후속 처리(입력 복원)를 판단할 수 있게 함
+- `usePushSubscription`의 구독 해제(`DELETE /api/notifications/subscribe`) 호출을 `fetch` 직접 호출에서 `apiClient.del(path, body)`로 되돌려, 다른 API 호출과 동일한 401 처리·인증 헤더 경로를 재사용 (DF-012)
+- 알림 생성 호출 5곳(에이전트 응답 완료·오류, 키 만료 등)을 `createNotification` 공통 경로로 통일
+- 로그인·설정 화면을 360px 폭에서 가로 스크롤 없이 보이도록 카드 레이아웃 조정 (UIR-001, 데스크톱 레이아웃 무변경)
+
+### Fixed
+- SCR-M02 전송 실패 시 입력 내용이 복원되지 않던 문제 — 실패하면 `MessageComposer` 입력창에 보낸 내용을 되돌린다(그 사이 새로 입력을 시작했으면 덮어쓰지 않음). 실패 버블의 [다시 보내기]는 기존과 동일하게 유지 (DF-009)
+- 이전 대화(SCR-M02, EVT-M02-4)·알림 목록(SCR-M03, EVT-M03-7) 추가 로딩 실패 시 재시도 UI가 없던 문제 — 각 스토어에 `loadMoreError` 상태를 추가하고, 실패 시 스크롤에 의한 자동 재시도를 멈추고 화면에 "다시(시도)" 버튼을 노출한다 (DF-011)
+- `apiClient.del`이 요청 바디를 받지 못해 바디가 필요한 `DELETE /api/notifications/subscribe`를 `usePushSubscription.ts`가 `fetch`로 우회 호출하던 문제 (DF-012)
+- 알림 API `GET` total 필터·`mark-read` 처리 건수 불일치 (DF-005)
+- 최초 비밀번호 설정 후 폐기된 `/workspace`(v3 Phase 2 3D 화면)로 이동하던 문제 — 폭에 따라 `/m/chat` 또는 `/dashboard`로 이동 (DF-006)
+- 테스트 인스턴스(`claudemanager-mtest`)가 운영 env를 상속해 운영 DB에 접속한 사고 방지 — `env -i` 격리 + `.env.local` 검증 (DF-008, 대표 결정 D-15 대기 항목 별도 존재)
+- 실시간(WS) `SERVER_EVENTS`에 누락되어 있던 `notification:read`·`chat:tool`·`chat:queue` 브로드캐스트 추가
+- `allowedDevOrigins`에 Tailscale HTTPS 호스트 추가

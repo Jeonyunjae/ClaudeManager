@@ -97,7 +97,8 @@ export function isPushEnabled(): boolean {
 export async function sendPushNotification(
   title: string,
   body: string,
-  url?: string
+  url?: string,
+  tag?: string
 ): Promise<void> {
   if (!isPushEnabled()) return;
 
@@ -118,7 +119,7 @@ export async function sendPushNotification(
       process.env.VAPID_PRIVATE_KEY!
     );
 
-    const payload = JSON.stringify({ title, body, url: url || '/' });
+    const payload = JSON.stringify({ title, body, url: url || '/', tag });
     const expiredEndpoints: string[] = [];
 
     await Promise.allSettled(

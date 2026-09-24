@@ -1,4 +1,12 @@
-export type NotificationType = 'approval' | 'error' | 'complete' | 'cost' | 'recovery' | 'info';
+export type NotificationType =
+  | 'approval'
+  | 'error'
+  | 'complete'
+  | 'cost'
+  | 'recovery'
+  | 'info'
+  | 'warning'
+  | 'key_expiry_warning';
 
 export type Notification = {
   id: number;

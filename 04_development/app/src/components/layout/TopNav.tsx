@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { formatRelativeTime } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { useViewMode } from '@/hooks/useViewMode';
+import { desktopTargetFor } from '@/lib/desktop-nav';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard' },
@@ -173,9 +174,11 @@ export function TopNav() {
                         key={notif.id}
                         onClick={() => {
                           markRead([notif.id]);
-                          if (notif.targetUrl) {
+                          // BUG-002 (NFR-001): 모바일 전용 경로(/m/...)로는 데스크톱에서 이동하지 않는다.
+                          const target = desktopTargetFor(notif.targetUrl);
+                          if (target) {
                             setShowNotifications(false);
-                            router.push(notif.targetUrl);
+                            router.push(target);
                           }
                         }}
                         style={{

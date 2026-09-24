@@ -95,8 +95,14 @@ export type SubscribeDeps = {
  */
 export async function runSubscribeFlow(deps: SubscribeDeps): Promise<SubscribeFlowResult> {
   const permission = await deps.requestPermission();
-  if (permission !== 'granted') {
+  if (permission === 'denied') {
     return { state: 'denied' };
+  }
+  if (permission !== 'granted') {
+    // BUG-009: 권한 창을 닫아 'default'가 돌아온 경우(선택하지 않음)는 거부가 아니다 —
+    // denied로 처리하면 [푸시 켜기] 버튼이 다시 나타나지 않는다. default를 유지해 사용자가
+    // 다시 시도할 수 있게 한다.
+    return { state: 'default' };
   }
 
   try {

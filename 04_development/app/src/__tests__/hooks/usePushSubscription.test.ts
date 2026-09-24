@@ -147,6 +147,21 @@ describe('runSubscribeFlow', () => {
     expect(calls).toEqual(['requestPermission']);
   });
 
+  // BUG-009: 권한 창을 닫아 'default'가 돌아오는 경우는 denied가 아니다.
+  it("권한 창을 닫아 'default'가 돌아오면 denied가 아니라 default를 반환한다 (BUG-009)", async () => {
+    const { deps, calls } = makeSubscribeDeps({
+      requestPermission: vi.fn(async () => {
+        calls.push('requestPermission');
+        return 'default' as NotificationPermission;
+      }),
+    });
+
+    const result = await runSubscribeFlow(deps);
+
+    expect(result).toEqual({ state: 'default' });
+    expect(calls).toEqual(['requestPermission']);
+  });
+
   it('VAPID 공개키가 없으면(server-disabled) 구독을 시도하지 않는다', async () => {
     const { deps } = makeSubscribeDeps({
       fetchVapidKey: vi.fn(async () => ({ enabled: false, vapidPublicKey: null })),

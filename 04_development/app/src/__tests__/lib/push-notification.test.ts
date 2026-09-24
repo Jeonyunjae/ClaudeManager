@@ -2,6 +2,14 @@
  * lib/push-notification.ts 단위 테스트 — 웹 푸시 구독 관리·발송.
  * DB(drizzle)는 key-expiry-checker.test.ts와 같은 패턴으로 모킹하고,
  * 실제 네트워크로 나가는 web-push의 setVapidDetails·sendNotification만 모킹한다.
+ *
+ * BUG-017: 실제 `web-push`는 CJS 패키지라 ESM 동적 import 결과가
+ * `{ default: { setVapidDetails, sendNotification, ... }, WebPushError, ... }`
+ * 형태로 온다(직접 확인: `import('web-push')`의 키는 `[WebPushError, default,
+ * supportedContentEncodings]`뿐, 최상위에 setVapidDetails가 없다). 아래
+ * 전역 모킹은 그 실제 형태(default 래핑만)를 반영한다 — 예전 코드처럼
+ * `mod.default` 언랩 없이 `mod.setVapidDetails`를 직접 부르면 이 목에서는
+ * undefined가 되어 테스트가 실패한다(Red). 언랩 로직이 있어야 통과한다(Green).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -30,9 +38,10 @@ vi.mock('@/lib/db', () => ({
 const mockSetVapidDetails = vi.fn();
 const mockSendNotification = vi.fn();
 
+// 실제 web-push(CJS)와 같은 형태 — default 아래에만 API가 있다 (BUG-017)
 vi.mock('web-push', () => ({
-  setVapidDetails: mockSetVapidDetails,
-  sendNotification: mockSendNotification,
+  WebPushError: class WebPushError extends Error {},
+  supportedContentEncodings: ['aes128gcm'],
   default: {
     setVapidDetails: mockSetVapidDetails,
     sendNotification: mockSendNotification,
@@ -271,6 +280,81 @@ describe('push-notification.ts', () => {
 
       const [, payload] = mockSendNotification.mock.calls[0];
       expect(JSON.parse(payload).url).toBe('/');
+    });
+
+    it('BUG-017: default로 래핑된 모듈(실제 web-push 형태)이면 default 아래 API가 호출된다', async () => {
+      // 파일 상단 전역 vi.mock('web-push', ...)이 이미 default 전용 형태이므로,
+      // 위의 "활성 구독 전원에게 발송" 테스트가 이 경로를 검증한다. 여기서는
+      // 명시적으로 다시 한 번 default 언랩 호출을 확인해 회귀를 막는다.
+      setVapidEnv();
+      mockLimit.mockResolvedValue([
+        {
+          value: JSON.stringify([
+            { endpoint: 'https://push.example/wrapped', keys: { p256dh: 'p', auth: 'a' }, createdAt: 'x' },
+          ]),
+        },
+      ]);
+      mockSendNotification.mockResolvedValue(undefined);
+      const { sendPushNotification } = await import('@/lib/push-notification');
+
+      await sendPushNotification('제목', '본문');
+
+      expect(mockSetVapidDetails).toHaveBeenCalledTimes(1);
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+    });
+
+    it('BUG-017: 최상위(비래핑) 형태의 web-push 모듈도 그대로 동작한다', async () => {
+      setVapidEnv();
+      mockLimit.mockResolvedValue([
+        {
+          value: JSON.stringify([
+            { endpoint: 'https://push.example/unwrapped', keys: { p256dh: 'p', auth: 'a' }, createdAt: 'x' },
+          ]),
+        },
+      ]);
+
+      const flatSetVapidDetails = vi.fn();
+      const flatSendNotification = vi.fn().mockResolvedValue(undefined);
+      // vitest의 동적 import 모킹은 CJS 인터롭 상 "default" 키 존재를 요구하므로
+      // 명시적으로 undefined를 둬 "default가 없는(비래핑) 모듈"을 흉내 낸다 —
+      // unwrapWebPush()의 `mod.default ?? mod` 중 `?? mod` 분기를 태운다.
+      vi.doMock('web-push', () => ({
+        default: undefined,
+        setVapidDetails: flatSetVapidDetails,
+        sendNotification: flatSendNotification,
+      }));
+      vi.resetModules();
+
+      try {
+        const { sendPushNotification } = await import('@/lib/push-notification');
+        await sendPushNotification('제목', '본문');
+
+        expect(flatSetVapidDetails).toHaveBeenCalledWith('mailto:a@b.com', 'pub', 'priv');
+        expect(flatSendNotification).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.doUnmock('web-push');
+      }
+    });
+
+    it('BUG-017: setVapidDetails/sendNotification이 없는 모듈이면 예외 없이 건너뛴다(모듈 로드 실패로 취급)', async () => {
+      setVapidEnv();
+      mockLimit.mockResolvedValue([
+        {
+          value: JSON.stringify([
+            { endpoint: 'https://push.example/broken', keys: { p256dh: 'p', auth: 'a' }, createdAt: 'x' },
+          ]),
+        },
+      ]);
+
+      vi.doMock('web-push', () => ({ default: {} }));
+      vi.resetModules();
+
+      try {
+        const { sendPushNotification } = await import('@/lib/push-notification');
+        await expect(sendPushNotification('제목', '본문')).resolves.toBeUndefined();
+      } finally {
+        vi.doUnmock('web-push');
+      }
     });
   });
 });

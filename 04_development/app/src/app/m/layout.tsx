@@ -4,10 +4,19 @@ import React, { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useMobileRealtime } from '@/hooks/useMobileRealtime';
 import { useApprovalStore } from '@/stores/approvalStore';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { useInboxStore } from '@/stores/inboxStore';
+import { useAgentStore } from '@/stores/agentStore';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 
+/** SCR-M02(대화)에서는 하단 탭을 숨긴다 — 입력 공간 확보 + 키보드와 겹침 방지 (DES-006) */
+function isConversationScreen(pathname: string): boolean {
+  return /^\/m\/chat\/[^/]+$/.test(pathname);
+}
+
+/** 공통 MobileShell (`/m` layout) — DES-006 §공통. 100dvh + safe-area, 진입 시 인박스·트리 조회 + WS 연결 */
 export default function MobileLayout({
   children,
 }: {
@@ -18,25 +27,32 @@ export default function MobileLayout({
   // useAuth 자체의 기본 동작(`/login`)은 바꾸지 않고, 여기서만 redirectTo를 넘긴다.
   const { isAuthenticated } = useAuth(`/login?next=${encodeURIComponent(pathname)}`);
   useWebSocket();
+  useMobileRealtime();
 
   const { fetchPending } = useApprovalStore();
   const { fetchNotifications } = useNotificationStore();
+  const { fetchInbox } = useInboxStore();
+  const { fetchTree } = useAgentStore();
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchPending();
       fetchNotifications();
+      fetchInbox();
+      fetchTree();
     }
-  }, [isAuthenticated, fetchPending, fetchNotifications]);
+  }, [isAuthenticated, fetchPending, fetchNotifications, fetchInbox, fetchTree]);
 
   if (!isAuthenticated) return null;
 
+  const showBottomNav = !isConversationScreen(pathname);
+
   return (
-    <div className="min-h-screen flex flex-col pb-16">
-      <main className="flex-1 flex flex-col">
+    <div className="flex flex-col" style={{ height: '100dvh' }}>
+      <main className={`flex-1 flex flex-col overflow-hidden ${showBottomNav ? 'pb-16' : ''}`}>
         {children}
       </main>
-      <MobileBottomNav />
+      {showBottomNav && <MobileBottomNav />}
     </div>
   );
 }

@@ -4,6 +4,11 @@
 
 /* eslint-disable no-restricted-globals */
 
+/** notificationclick의 이동 대상 URL 판정 (DES-007 §6) — url 없으면 '/m/chat'. */
+function resolveNotificationTargetUrl(data) {
+  return (data && data.url) || '/m/chat';
+}
+
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
@@ -26,11 +31,11 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'ClaudeManager';
   const options = {
     body: data.body || '',
-    icon: '/assets/icon-192.png',
-    badge: '/assets/badge-72.png',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/badge-72.png',
     tag: data.tag || 'claudemanager-notification',
     data: {
-      url: data.url || '/',
+      url: resolveNotificationTargetUrl(data),
     },
     actions: [
       { action: 'open', title: 'Open' },
@@ -47,7 +52,7 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'dismiss') return;
 
-  const targetUrl = event.notification.data?.url || '/';
+  const targetUrl = resolveNotificationTargetUrl(event.notification.data);
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
@@ -63,3 +68,8 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+
+// 테스트 전용 export — 브라우저 SW 컨텍스트에는 `module`이 없으므로 `typeof` 가드로 안전하게 no-op된다.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { resolveNotificationTargetUrl };
+}

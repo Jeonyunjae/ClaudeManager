@@ -4,10 +4,11 @@ import React, { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { NotificationItem } from '@/components/mobile/NotificationItem';
+import { PushCard } from '@/components/mobile/PushCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Notification } from '@/types/notification';
 
-/** SCR-M03 알림 `/m/notifications` — DES-006, FR-009·FR-013 (목록 부분. 푸시 카드는 다음 배치) */
+/** SCR-M03 알림 `/m/notifications` — DES-006, FR-009·FR-010·FR-013 */
 export default function MobileNotificationsPage() {
   const router = useRouter();
   const {
@@ -66,7 +67,7 @@ export default function MobileNotificationsPage() {
         </button>
       </header>
 
-      {/* 푸시 카드 자리 — 다음 배치에서 PushCard(usePushSubscription)를 채운다 */}
+      <PushCard />
 
       <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
         {isLoading && (

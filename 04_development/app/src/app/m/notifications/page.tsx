@@ -17,6 +17,7 @@ export default function MobileNotificationsPage() {
     isLoading,
     loadingMore,
     error,
+    loadMoreError,
     hasMore,
     fetchNotifications,
     loadMore,
@@ -44,11 +45,12 @@ export default function MobileNotificationsPage() {
   }
 
   // EVT-M03-7: 목록 끝 스크롤 -> 다음 30건
+  // loadMoreError가 있으면 스크롤로 자동 재시도하지 않는다 — [다시 시도]를 눌러야 한다 (DF-011)
   function handleScroll(): void {
     const el = containerRef.current;
     if (!el) return;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    if (nearBottom && hasMore && !loadingMore) {
+    if (nearBottom && hasMore && !loadingMore && !loadMoreError) {
       loadMore();
     }
   }
@@ -107,6 +109,15 @@ export default function MobileNotificationsPage() {
 
         {loadingMore && (
           <p className="text-center text-xs text-[var(--text-tertiary)] py-3">불러오는 중…</p>
+        )}
+
+        {loadMoreError && !loadingMore && (
+          <p className="text-center text-xs text-[var(--status-error-text)] py-3">
+            {loadMoreError} ·{' '}
+            <button type="button" onClick={() => loadMore()} className="text-[var(--primary-500)] font-medium underline">
+              다시 시도
+            </button>
+          </p>
         )}
       </div>
     </div>

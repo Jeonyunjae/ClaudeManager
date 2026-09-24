@@ -14,6 +14,8 @@ type ConversationViewProps = {
   loadingMore: boolean;
   loading: boolean;
   error: string | null;
+  /** DF-011: EVT-M02-4 추가 로딩 실패 — 목록 맨 위 "불러오지 못했습니다 · 다시" */
+  loadMoreError: string | null;
   onLoadMore: () => void;
   onRetry: () => void;
   onResend: (messageId: string) => void;
@@ -38,6 +40,7 @@ export function ConversationView({
   loadingMore,
   loading,
   error,
+  loadMoreError,
   onLoadMore,
   onRetry,
   onResend,
@@ -64,11 +67,21 @@ export function ConversationView({
   function handleScroll(): void {
     const el = containerRef.current;
     if (!el) return;
-    if (el.scrollTop < 40 && hasMore && !loadingMore) {
+    // loadMoreError가 있으면 스크롤로 자동 재시도하지 않는다 — 사용자가 [다시]를 눌러야 한다 (DF-011)
+    if (el.scrollTop < 40 && hasMore && !loadingMore && !loadMoreError) {
       isPrependRef.current = true;
       prevScrollHeightRef.current = el.scrollHeight;
       onLoadMore();
     }
+  }
+
+  function handleRetryLoadMore(): void {
+    const el = containerRef.current;
+    if (el) {
+      isPrependRef.current = true;
+      prevScrollHeightRef.current = el.scrollHeight;
+    }
+    onLoadMore();
   }
 
   if (loading) {
@@ -94,6 +107,15 @@ export function ConversationView({
     <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-3">
       {loadingMore && (
         <p className="text-center text-xs text-[var(--text-tertiary)] py-2">이전 대화 불러오는 중…</p>
+      )}
+
+      {loadMoreError && !loadingMore && (
+        <p className="text-center text-xs text-[var(--status-error-text)] py-2">
+          {loadMoreError} ·{' '}
+          <button type="button" onClick={handleRetryLoadMore} className="text-[var(--primary-500)] font-medium underline">
+            다시
+          </button>
+        </p>
       )}
 
       {messages.length === 0 && !streaming && (

@@ -13,6 +13,8 @@ type NotificationState = {
   isLoading: boolean;
   loadingMore: boolean;
   error: string | null;
+  /** DF-011: EVT-M03-7 추가 로딩 실패 — 목록 끝 "다시 시도" */
+  loadMoreError: string | null;
   page: number;
   hasMore: boolean;
   fetchNotifications: (unreadOnly?: boolean) => Promise<void>;
@@ -31,11 +33,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   isLoading: false,
   loadingMore: false,
   error: null,
+  loadMoreError: null,
   page: 1,
   hasMore: false,
 
   fetchNotifications: async (unreadOnly = false) => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, error: null, loadMoreError: null });
     try {
       const url = unreadOnly
         ? `/api/notifications?unread=true&page=1&limit=${NOTIFICATIONS_PAGE_SIZE}`
@@ -48,6 +51,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         isLoading: false,
         page: 1,
         hasMore: res.pagination.hasMore,
+        loadMoreError: null,
       });
     } catch {
       set({ isLoading: false, error: '불러오지 못했습니다' });
@@ -58,7 +62,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     const { hasMore, loadingMore, page } = get();
     if (!hasMore || loadingMore) return;
 
-    set({ loadingMore: true });
+    set({ loadingMore: true, loadMoreError: null });
     try {
       const nextPage = page + 1;
       const res = await apiClient.getPaginated<Notification>(
@@ -69,9 +73,11 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         page: nextPage,
         hasMore: res.pagination.hasMore,
         loadingMore: false,
+        loadMoreError: null,
       }));
     } catch {
-      set({ loadingMore: false });
+      // DF-011: 목록 끝 "다시 시도" — loadMoreError가 남아 있는 동안은 스크롤이 자동 재시도하지 않는다.
+      set({ loadingMore: false, loadMoreError: '불러오지 못했습니다' });
     }
   },
 

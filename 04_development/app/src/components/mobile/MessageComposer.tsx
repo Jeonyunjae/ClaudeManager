@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 type MessageComposerProps = {
   sending: boolean;
-  onSend: (content: string) => void;
+  /** 성공 시 true, 실패 시 false를 돌려준다 — DF-009: 실패하면 입력 내용을 복원한다 */
+  onSend: (content: string) => Promise<boolean>;
 };
 
 const MIN_ROWS = 1;
@@ -25,19 +26,28 @@ export function MessageComposer({ sending, onSend }: MessageComposerProps) {
     el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
   }
 
+  // value가 어떤 경로로든(타이핑, 전송 시 비움, 실패 시 복원) 바뀌면 높이를 다시 맞춘다 —
+  // DOM에 반영된 뒤(커밋 후) 실행되어야 scrollHeight가 정확하다.
+  useEffect(() => {
+    if (textareaRef.current) autoResize(textareaRef.current);
+  }, [value]);
+
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>): void {
     setValue(e.target.value);
-    autoResize(e.target);
   }
 
-  function handleSubmit(): void {
+  async function handleSubmit(): Promise<void> {
     if (!canSend) return;
     const content = value;
-    setValue(''); // EVT-M02-2: 입력창 비움 (전송 성공/실패와 무관하게 즉시)
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+    setValue(''); // EVT-M02-2: 입력창 비움 (전송 시도와 동시에 즉시)
+
+    const ok = await onSend(content);
+
+    // DF-009: 전송 실패 시 입력 내용 복원. 그 사이 사용자가 새로 입력을 시작했으면(값이 비어 있지
+    // 않으면) 그 입력을 덮어쓰지 않는다.
+    if (!ok) {
+      setValue((latest) => (latest === '' ? content : latest));
     }
-    onSend(content);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {

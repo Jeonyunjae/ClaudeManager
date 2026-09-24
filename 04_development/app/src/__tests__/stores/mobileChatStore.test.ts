@@ -75,7 +75,35 @@ describe('mobileChatStore', () => {
     expect(mockGetPaginated).not.toHaveBeenCalled();
   });
 
-  it('send: 낙관적 버블을 추가하고 성공하면 sending을 해제한다', async () => {
+  // DF-011: EVT-M02-4 추가 로딩 실패 — 목록 맨 위 "불러오지 못했습니다 · 다시"
+  it('loadMore 실패 시 loadMoreError를 설정하고, 성공하면 다시 비운다', async () => {
+    mockGetPaginated
+      .mockResolvedValueOnce({
+        data: [{ id: 'm1', timestamp: '2026-09-24T01:00:00.000Z', content: 'first', type: 'report' }],
+        pagination: { page: 1, limit: 30, total: 2, hasMore: true },
+      })
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({
+        data: [{ id: 'm0', timestamp: '2026-09-24T00:00:00.000Z', content: 'zeroth', type: 'report' }],
+        pagination: { page: 2, limit: 30, total: 2, hasMore: false },
+      });
+
+    const { useMobileChatStore } = await import('@/stores/mobileChatStore');
+    await useMobileChatStore.getState().load('a1');
+
+    await useMobileChatStore.getState().loadMore('a1');
+    let s = useMobileChatStore.getState().getAgentState('a1');
+    expect(s.loadMoreError).toBe('불러오지 못했습니다');
+    expect(s.loadingMore).toBe(false);
+
+    // "다시" — 재시도 성공 시 loadMoreError가 풀린다
+    await useMobileChatStore.getState().loadMore('a1');
+    s = useMobileChatStore.getState().getAgentState('a1');
+    expect(s.loadMoreError).toBeNull();
+    expect(s.messages.map((m) => m.id)).toEqual(['m0', 'm1']);
+  });
+
+  it('send: 낙관적 버블을 추가하고 성공하면 sending을 해제하고 true를 반환한다', async () => {
     mockPost.mockResolvedValue({ data: { userMessage: { id: 'u1', sender: 'user', content: '안녕' }, status: 'processing', responseMsgId: 'r1' } });
 
     const { useMobileChatStore } = await import('@/stores/mobileChatStore');
@@ -85,28 +113,32 @@ describe('mobileChatStore', () => {
     expect(useMobileChatStore.getState().getAgentState('a1').messages).toHaveLength(1);
     expect(useMobileChatStore.getState().getAgentState('a1').sending).toBe(true);
 
-    await promise;
+    const ok = await promise;
 
     const s = useMobileChatStore.getState().getAgentState('a1');
+    expect(ok).toBe(true);
     expect(s.sending).toBe(false);
     expect(s.messages[0].content).toBe('안녕');
     expect(s.messages[0].failed).toBeUndefined();
   });
 
-  it('send: 공백만 있으면 아무 것도 하지 않는다', async () => {
+  it('send: 공백만 있으면 아무 것도 하지 않고 false를 반환한다', async () => {
     const { useMobileChatStore } = await import('@/stores/mobileChatStore');
-    await useMobileChatStore.getState().send('a1', '   ');
+    const ok = await useMobileChatStore.getState().send('a1', '   ');
+    expect(ok).toBe(false);
     expect(mockPost).not.toHaveBeenCalled();
     expect(useMobileChatStore.getState().getAgentState('a1').messages).toHaveLength(0);
   });
 
-  it('send: 실패하면 버블에 failed 표시를 남기고 sending을 해제한다', async () => {
+  // DF-009: 전송 실패 시 호출부(MessageComposer)가 입력 내용을 복원할 수 있도록 false를 반환한다
+  it('send: 실패하면 버블에 failed 표시를 남기고 sending을 해제하며 false를 반환한다', async () => {
     mockPost.mockRejectedValue(new Error('500'));
 
     const { useMobileChatStore } = await import('@/stores/mobileChatStore');
-    await useMobileChatStore.getState().send('a1', '안녕');
+    const ok = await useMobileChatStore.getState().send('a1', '안녕');
 
     const s = useMobileChatStore.getState().getAgentState('a1');
+    expect(ok).toBe(false);
     expect(s.sending).toBe(false);
     expect(s.messages[0].failed).toBe(true);
   });

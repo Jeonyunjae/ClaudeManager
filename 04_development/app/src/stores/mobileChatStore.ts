@@ -35,6 +35,8 @@ export type AgentChatState = {
   queueDepth: number;
   typing: boolean;
   error: string | null;
+  /** DF-011: 이전 대화(EVT-M02-4) 추가 로딩 실패 — 목록 맨 위 "불러오지 못했습니다 · 다시" */
+  loadMoreError: string | null;
 };
 
 /** 모바일 대화 페이지 크기 (DES-009 `CONVERSATION_PAGE_SIZE_MOBILE`) */
@@ -52,6 +54,7 @@ export function emptyAgentChatState(): AgentChatState {
     queueDepth: 0,
     typing: false,
     error: null,
+    loadMoreError: null,
   };
 }
 
@@ -71,7 +74,8 @@ type MobileChatState = {
 
   load: (agentId: string) => Promise<void>;
   loadMore: (agentId: string) => Promise<void>;
-  send: (agentId: string, content: string) => Promise<void>;
+  /** 성공 시 true, 실패 시 false — DF-009: 호출부(MessageComposer)가 실패 시 입력 내용을 복원한다 */
+  send: (agentId: string, content: string) => Promise<boolean>;
   resend: (agentId: string, messageId: string) => Promise<void>;
 
   // WS 핸들러가 호출하는 순수 반영 함수들 (테스트 용이)
@@ -93,7 +97,7 @@ export const useMobileChatStore = create<MobileChatState>((set, get) => ({
     set((state) => ({
       byAgent: {
         ...state.byAgent,
-        [agentId]: { ...getOrInit(state.byAgent, agentId), loading: true, error: null },
+        [agentId]: { ...getOrInit(state.byAgent, agentId), loading: true, error: null, loadMoreError: null },
       },
     }));
     try {
@@ -109,6 +113,7 @@ export const useMobileChatStore = create<MobileChatState>((set, get) => ({
             page: 1,
             hasMore: res.pagination.hasMore,
             loading: false,
+            loadMoreError: null,
           },
         },
       }));
@@ -128,7 +133,7 @@ export const useMobileChatStore = create<MobileChatState>((set, get) => ({
     if (!current.hasMore || current.loadingMore) return;
 
     set((state) => ({
-      byAgent: { ...state.byAgent, [agentId]: { ...current, loadingMore: true } },
+      byAgent: { ...state.byAgent, [agentId]: { ...current, loadingMore: true, loadMoreError: null } },
     }));
     try {
       const nextPage = current.page + 1;
@@ -146,21 +151,27 @@ export const useMobileChatStore = create<MobileChatState>((set, get) => ({
               page: nextPage,
               hasMore: res.pagination.hasMore,
               loadingMore: false,
+              loadMoreError: null,
             },
           },
         };
       });
     } catch {
+      // DF-011: 목록 맨 위 "불러오지 못했습니다 · 다시" — 다음 스크롤에서 자동 재시도하지 않고
+      // 사용자가 [다시]를 눌러야 재시도한다 (loadMoreError가 남아 있는 동안 컴포넌트가 자동 호출을 막는다).
       set((state) => ({
-        byAgent: { ...state.byAgent, [agentId]: { ...getOrInit(state.byAgent, agentId), loadingMore: false } },
+        byAgent: {
+          ...state.byAgent,
+          [agentId]: { ...getOrInit(state.byAgent, agentId), loadingMore: false, loadMoreError: '불러오지 못했습니다' },
+        },
       }));
     }
   },
 
-  // EVT-M02-2: 전송 — 낙관적 버블 추가, 실패 시 버블에 실패 표시(다시 보내기 가능)
+  // EVT-M02-2: 전송 — 낙관적 버블 추가, 실패 시 버블에 실패 표시(다시 보내기 가능) + 입력 내용 복원(DF-009)
   send: async (agentId, content) => {
     const trimmed = content.trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
 
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const optimistic: ConversationMessage = {
@@ -185,6 +196,7 @@ export const useMobileChatStore = create<MobileChatState>((set, get) => ({
       set((state) => ({
         byAgent: { ...state.byAgent, [agentId]: { ...getOrInit(state.byAgent, agentId), sending: false } },
       }));
+      return true;
     } catch {
       set((state) => {
         const current = getOrInit(state.byAgent, agentId);
@@ -199,6 +211,7 @@ export const useMobileChatStore = create<MobileChatState>((set, get) => ({
           },
         };
       });
+      return false;
     }
   },
 

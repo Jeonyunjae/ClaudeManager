@@ -46,5 +46,27 @@ if ! node "$APP_DIR/scripts/mtest-env-check.mjs" "$ENV_LOCAL" "$PROD_ENV_ARG"; t
   exit 1
 fi
 
-exec env -i HOME="$HOME" PATH="$PATH" USER="${USER:-}" LANG="${LANG:-C.UTF-8}" TERM=dumb \
+# BUG-015: env -i가 상속 env를 비우는 것(DF-008 격리 목적)은 유지하되, 실행에
+# 꼭 필요한 실행 경로(PATH)까지 통째로 비워지면 안 된다. 이전에는 env -i에
+# 넘기는 PATH="$PATH"가 이 스크립트를 부른 셸의 PATH를 그대로 썼는데, 그 셸에
+# claude CLI 위치(~/.local/bin)가 없으면(예: 좁은 PATH로 재기동된 경우)
+# src/lib/agent-manager.ts의 spawn('claude', ...)이 매 채팅마다 ENOENT로
+# 실패했다(BUG-015). node 실행 경로와 ~/.local/bin(claude 바이너리 위치, 있을
+# 때만)을 명시적으로 앞에 붙여, 어떤 셸에서 이 스크립트를 불렀든 CLI를 찾을 수
+# 있게 한다.
+NODE_BIN_DIR="$(dirname "$(command -v node)")"
+CLAUDE_LOCAL_BIN="$HOME/.local/bin"
+SAFE_PATH="$PATH"
+if [ -d "$CLAUDE_LOCAL_BIN" ]; then
+  SAFE_PATH="$CLAUDE_LOCAL_BIN:$SAFE_PATH"
+fi
+if [ -n "$NODE_BIN_DIR" ] && [ -d "$NODE_BIN_DIR" ]; then
+  SAFE_PATH="$NODE_BIN_DIR:$SAFE_PATH"
+fi
+
+if ! command -v claude >/dev/null 2>&1 && [ ! -x "$CLAUDE_LOCAL_BIN/claude" ]; then
+  echo "[mtest-start] 경고: claude CLI를 찾을 수 없다 (PATH: $SAFE_PATH) — chat 실행이 ENOENT로 실패할 수 있다 (BUG-015)." >&2
+fi
+
+exec env -i HOME="$HOME" PATH="$SAFE_PATH" USER="${USER:-}" LANG="${LANG:-C.UTF-8}" TERM=dumb \
   bash "$APP_DIR/scripts/pm2-start.sh"

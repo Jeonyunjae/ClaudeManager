@@ -40,7 +40,9 @@ export async function GET(request: NextRequest) {
       .where(eq(notifications.isRead, false))
       .limit(1);
 
-    const total = totalResult?.count ?? 0;
+    // DF-005: unread=true로 부르면 total도 안 읽은 건수로 센다
+    const unreadCount = unreadResult?.count ?? 0;
+    const total = unreadOnly ? unreadCount : (totalResult?.count ?? 0);
 
     return NextResponse.json({
       data: results,
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest) {
         total,
         hasMore: offset + limit < total,
       },
-      unreadCount: unreadResult?.count ?? 0,
+      unreadCount,
     });
   } catch (error) {
     logError(error, { requestPath: '/api/notifications' });

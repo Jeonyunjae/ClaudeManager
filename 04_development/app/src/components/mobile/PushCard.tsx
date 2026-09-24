@@ -45,61 +45,58 @@ export function PushCard() {
     }
   }
 
+  const secondaryButtonClass =
+    'min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--primary-200)] text-[var(--primary-600)] text-sm font-medium disabled:opacity-50';
+  const primaryButtonClass =
+    'min-h-[44px] px-4 rounded-[var(--radius-md)] bg-[var(--primary-500)] text-white text-sm font-medium disabled:opacity-50';
+
   return (
-    <section className="px-4 py-3 border-b border-[var(--primary-50)]" aria-label="푸시 알림">
-      <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-1">푸시 알림</h2>
+    <section className="px-4 py-3" aria-label="푸시 알림">
+      <div className="bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--primary-50)] shadow-[var(--shadow-sm)] p-4">
+        <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-1">푸시 알림</h2>
 
-      {loading ? (
-        <p className="text-sm text-[var(--text-tertiary)]">확인 중…</p>
-      ) : (
-        <>
-          <p className="text-sm text-[var(--text-secondary)]">{PUSH_STATE_TEXT[state]}</p>
+        {loading ? (
+          <p className="text-sm text-[var(--text-tertiary)]">확인 중…</p>
+        ) : (
+          <>
+            <p className="text-sm text-[var(--text-secondary)]">{PUSH_STATE_TEXT[state]}</p>
 
-          {error && <p className="text-xs text-[var(--status-error-text)] mt-1">{error}</p>}
+            {error && <p className="text-xs text-[var(--status-error-text)] mt-1">{error}</p>}
 
-          {state === 'needs-install' && (
-            <button
-              type="button"
-              onClick={() => setInstallOpen(true)}
-              className="mt-2 min-h-[44px] px-3 text-sm font-medium text-[var(--primary-600)]"
-            >
-              설치 방법
-            </button>
-          )}
+            {state === 'needs-install' && (
+              <div className="flex justify-end mt-3">
+                <button type="button" onClick={() => setInstallOpen(true)} className={secondaryButtonClass}>
+                  설치 방법
+                </button>
+              </div>
+            )}
 
-          {state === 'default' && (
-            <button
-              type="button"
-              onClick={handleSubscribe}
-              disabled={busy}
-              className="mt-2 min-h-[44px] px-4 rounded-[var(--radius-md)] bg-[var(--primary-500)] text-white text-sm font-medium disabled:opacity-50"
-            >
-              푸시 켜기
-            </button>
-          )}
+            {state === 'default' && (
+              <div className="flex justify-end mt-3">
+                <button type="button" onClick={handleSubscribe} disabled={busy} className={primaryButtonClass}>
+                  푸시 켜기
+                </button>
+              </div>
+            )}
 
-          {state === 'subscribed' && (
-            <button
-              type="button"
-              onClick={handleUnsubscribe}
-              disabled={busy}
-              className="mt-2 min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--primary-200)] text-[var(--primary-600)] text-sm font-medium disabled:opacity-50"
-            >
-              푸시 끄기
-            </button>
-          )}
+            {state === 'subscribed' && (
+              <div className="flex justify-end mt-3">
+                <button type="button" onClick={handleUnsubscribe} disabled={busy} className={secondaryButtonClass}>
+                  푸시 끄기
+                </button>
+              </div>
+            )}
 
-          {state === 'denied' && (
-            <button
-              type="button"
-              onClick={() => setPermissionOpen(true)}
-              className="mt-2 min-h-[44px] px-3 text-sm font-medium text-[var(--primary-600)]"
-            >
-              켜는 방법
-            </button>
-          )}
-        </>
-      )}
+            {state === 'denied' && (
+              <div className="flex justify-end mt-3">
+                <button type="button" onClick={() => setPermissionOpen(true)} className={secondaryButtonClass}>
+                  켜는 방법
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       <InstallGuideSheet open={installOpen} onClose={() => setInstallOpen(false)} />
       <PermissionGuideSheet open={permissionOpen} onClose={() => setPermissionOpen(false)} />

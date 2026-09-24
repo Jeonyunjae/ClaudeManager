@@ -66,3 +66,4 @@
 - `globals.css`의 레이어 밖 전역 초기화 `* { margin:0; padding:0 }`가 Tailwind v4 유틸리티(`p-*`·`m-*`·`space-*`)보다 우선 적용되어 모바일 4개 화면의 여백·카드 안쪽 여백·말풍선 여백이 전부 0으로 뭉개지던 문제 — 해당 규칙을 `@layer base`로 옮겨 유틸리티 클래스가 이기도록 정정 (BUG-024)
 - 운영(`next dev`) 실행 시 Next 개발 표시기("N" 버튼)가 화면 좌하단 모바일 하단 탭 [대화]를 가리던 문제 — `next.config.ts`에 `devIndicators: false` 추가 (BUG-025)
 - 모바일 대화 화면 헤더가 서버 `statusMessage` 영어 원문(`Completed`·`Working...`·`Error occurred` 등)을 그대로 표시하던 문제 — `lib/mobile-format.ts`에 알려진 값만 한국어로 바꾸는 `statusMessageLabel()`을 추가하고 헤더에 적용, 모르는 값은 원문 그대로 표시 (BUG-026)
+- BUG-024 여백 정정 후에도 `PushCard`·`AgentList`·`InboxSection`이 와이어프레임(DES-004 SCR-M01·SCR-M03)의 흰 카드 컨테이너·버튼 스타일과 달랐던 문제 — `PushCard`를 상태 화면과 같은 카드(`--bg-surface`·`--radius-lg`·`--shadow-sm`) 안에 넣고 액션을 오른쪽 정렬 버튼(켜기: primary 채움 / 끄기·설치 방법·켜는 방법: 보조 테두리)으로 통일, `AgentList`를 카드 컨테이너 + 행 구분선으로 감싸고, `InboxSection`의 [확인함]을 보조 테두리 버튼으로 바꾸고 빈 상태("대기 없음")를 카드 안 중앙 회색 텍스트로 정리. 기능·문구·이벤트는 변경 없음 (BUG-027)

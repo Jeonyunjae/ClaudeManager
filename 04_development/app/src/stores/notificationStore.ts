@@ -43,8 +43,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const url = unreadOnly
         ? `/api/notifications?unread=true&page=1&limit=${NOTIFICATIONS_PAGE_SIZE}`
         : `/api/notifications?page=1&limit=${NOTIFICATIONS_PAGE_SIZE}`;
-      const res = await apiClient.getPaginated<Notification>(url);
-      const unreadCount = res.data.filter((n) => !n.isRead).length;
+      // BUG-005: 배지는 서버가 전체 기준으로 계산한 unreadCount를 쓴다 — 이 페이지(최대 30건)
+      // 안에서 필터링하면 30건 밖에 있는 안 읽은 알림이 배지에서 누락된다.
+      const res = (await apiClient.getPaginated<Notification>(url)) as { data: Notification[]; pagination: { hasMore: boolean }; unreadCount?: number };
+      const unreadCount = Number(res.unreadCount ?? 0);
       set({
         notifications: res.data,
         unreadCount,
@@ -84,10 +86,14 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   markRead: async (ids) => {
     await apiClient.post('/api/notifications/mark-read', { ids });
     set((state) => {
-      const notifications = state.notifications.map((n) =>
-        ids.includes(n.id) ? { ...n, isRead: true } : n
-      );
-      return { notifications, unreadCount: notifications.filter((n) => !n.isRead).length };
+      // BUG-005: unreadCount는 서버 기준값에서 시작하므로, 로드된 목록만으로 다시 세면(필터)
+      // 30건 밖의 안 읽은 알림이 사라진 것처럼 보인다 — 이번에 실제로 읽음 처리된 건수만큼만 뺀다.
+      let decremented = 0;
+      const notifications = state.notifications.map((n) => {
+        if (ids.includes(n.id) && !n.isRead) decremented += 1;
+        return ids.includes(n.id) ? { ...n, isRead: true } : n;
+      });
+      return { notifications, unreadCount: Math.max(0, state.unreadCount - decremented) };
     });
   },
 
@@ -108,16 +114,21 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   applyRead: (ids) => {
     set((state) => {
-      let notifications: Notification[];
       if (ids === 'all') {
-        notifications = state.notifications.map((n) => ({ ...n, isRead: true }));
-      } else {
-        const idSet = new Set(ids.map(String));
-        notifications = state.notifications.map((n) =>
-          idSet.has(String(n.id)) ? { ...n, isRead: true } : n
-        );
+        return {
+          notifications: state.notifications.map((n) => ({ ...n, isRead: true })),
+          unreadCount: 0,
+        };
       }
-      return { notifications, unreadCount: notifications.filter((n) => !n.isRead).length };
+      // BUG-005: 목록 필터가 아니라 실제로 상태가 바뀐 건수만큼만 unreadCount를 줄인다
+      // (근거는 markRead와 동일 — 서버 기준 unreadCount가 로드된 목록보다 클 수 있다).
+      const idSet = new Set(ids.map(String));
+      let decremented = 0;
+      const notifications = state.notifications.map((n) => {
+        if (idSet.has(String(n.id)) && !n.isRead) decremented += 1;
+        return idSet.has(String(n.id)) ? { ...n, isRead: true } : n;
+      });
+      return { notifications, unreadCount: Math.max(0, state.unreadCount - decremented) };
     });
   },
 }));

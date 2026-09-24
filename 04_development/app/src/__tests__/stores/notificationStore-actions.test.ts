@@ -38,9 +38,11 @@ describe('notificationStore actions', () => {
   });
 
   it('fetchNotifications 성공 시 목록·unreadCount·hasMore를 채운다', async () => {
+    // BUG-005: unreadCount는 서버가 내려주는 값을 그대로 쓴다 (이 목록 안에서 다시 세지 않는다).
     mockGetPaginated.mockResolvedValue({
       data: [makeNotification({ id: 1, isRead: false }), makeNotification({ id: 2, isRead: true })],
       pagination: { page: 1, limit: 30, total: 2, hasMore: true },
+      unreadCount: 1,
     });
 
     const { useNotificationStore } = await import('@/stores/notificationStore');
@@ -55,7 +57,7 @@ describe('notificationStore actions', () => {
   });
 
   it('fetchNotifications(unreadOnly=true)는 unread 쿼리 파라미터를 붙인다', async () => {
-    mockGetPaginated.mockResolvedValue({ data: [], pagination: { page: 1, limit: 30, total: 0, hasMore: false } });
+    mockGetPaginated.mockResolvedValue({ data: [], pagination: { page: 1, limit: 30, total: 0, hasMore: false }, unreadCount: 0 });
     const { useNotificationStore } = await import('@/stores/notificationStore');
 
     await useNotificationStore.getState().fetchNotifications(true);
@@ -80,6 +82,7 @@ describe('notificationStore actions', () => {
     mockGetPaginated.mockResolvedValue({
       data: [makeNotification({ id: 1, isRead: false }), makeNotification({ id: 2, isRead: false })],
       pagination: { page: 1, limit: 30, total: 2, hasMore: false },
+      unreadCount: 2,
     });
     mockPost.mockResolvedValue({ data: {} });
 
@@ -98,6 +101,7 @@ describe('notificationStore actions', () => {
     mockGetPaginated.mockResolvedValue({
       data: [makeNotification({ id: 1, isRead: false }), makeNotification({ id: 2, isRead: false })],
       pagination: { page: 1, limit: 30, total: 2, hasMore: false },
+      unreadCount: 2,
     });
     mockPost.mockResolvedValue({ data: {} });
 
@@ -145,6 +149,39 @@ describe('notificationStore actions', () => {
       expect(state.notifications.find((n) => n.id === 1)?.isRead).toBe(true);
       expect(state.notifications.find((n) => n.id === 2)?.isRead).toBe(false);
       expect(state.unreadCount).toBe(1);
+    });
+  });
+
+  // BUG-005: 서버 unreadCount(45)가 로드된 페이지(30건) 안의 안 읽은 건수(20)보다 클 때
+  // 배지가 30건 목록 기준으로 깎이면 안 된다.
+  describe('BUG-005 — 배지는 서버 unreadCount 기준, 30건 목록 기준이 아니다', () => {
+    it('로드된 목록의 unread 건수보다 서버 unreadCount가 크면 그 값을 그대로 쓴다', async () => {
+      mockGetPaginated.mockResolvedValue({
+        data: [makeNotification({ id: 1, isRead: false }), makeNotification({ id: 2, isRead: true })],
+        pagination: { page: 1, limit: 30, total: 45, hasMore: true },
+        unreadCount: 45, // 목록 안에서 필터링하면 1이지만, 서버 전체 기준은 45
+      });
+
+      const { useNotificationStore } = await import('@/stores/notificationStore');
+      await useNotificationStore.getState().fetchNotifications();
+
+      expect(useNotificationStore.getState().unreadCount).toBe(45);
+    });
+
+    it('markRead 이후에도 목록 필터가 아니라 실제로 읽음 처리된 건수만큼만 unreadCount를 줄인다', async () => {
+      mockGetPaginated.mockResolvedValue({
+        data: [makeNotification({ id: 1, isRead: false }), makeNotification({ id: 2, isRead: true })],
+        pagination: { page: 1, limit: 30, total: 45, hasMore: true },
+        unreadCount: 45,
+      });
+      mockPost.mockResolvedValue({ data: {} });
+
+      const { useNotificationStore } = await import('@/stores/notificationStore');
+      await useNotificationStore.getState().fetchNotifications();
+      await useNotificationStore.getState().markRead([1]);
+
+      // 45에서 이번에 읽음 처리된 1건만 빠져야 한다 (목록 기준 필터링이었다면 0으로 떨어졌을 것)
+      expect(useNotificationStore.getState().unreadCount).toBe(44);
     });
   });
 });

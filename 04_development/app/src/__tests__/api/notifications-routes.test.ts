@@ -6,6 +6,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { generateToken } from '@/lib/auth';
 
 const h = vi.hoisted(() => {
@@ -26,7 +28,7 @@ const h = vi.hoisted(() => {
   }
 
   const updateReturning = vi.fn();
-  const updateWhere = vi.fn(() => ({ returning: updateReturning }));
+  const updateWhere = vi.fn((_condition?: unknown) => ({ returning: updateReturning }));
   const updateSet = vi.fn(() => ({ where: updateWhere }));
   const update = vi.fn(() => ({ set: updateSet }));
   const select = vi.fn(() => makeSelectChain());
@@ -195,6 +197,57 @@ describe('POST /api/notifications/mark-read (DF-005)', () => {
 
     expect(json.data.updated).toBe(3);
     expect(mockWsBroadcast).toHaveBeenCalledWith('notification:read', { ids: 'all' });
+  });
+
+  // BUG-016: ids 지정 분기의 WHERE에 isRead=false 조건이 빠져 있어, 이미 읽은
+  // id를 다시 mark-read해도 매번 updated:1(재현: 같은 id 2회 연속 POST → 1차
+  // {updated:1}, 2차도 {updated:1}, 기대값은 0)로 나왔다. 실제 SQL 조건을
+  // PgDialect로 렌더링해 isRead=false가 ids 조건과 AND로 결합돼 있는지 구조적으로
+  // 검증한다 — mock의 반환값만 바꿔치는 방식으로는 WHERE 절 누락을 못 잡는다.
+  it('ids 분기의 WHERE는 대상 id뿐 아니라 isRead=false도 함께 건다 (BUG-016)', async () => {
+    const { POST } = await import('@/app/api/notifications/mark-read/route');
+    h.updateReturning.mockResolvedValueOnce([{ id: 1 }]);
+
+    const req = new NextRequest('http://localhost/api/notifications/mark-read', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ ids: [1] }),
+    });
+    await POST(req);
+
+    expect(h.updateWhere).toHaveBeenCalledTimes(1);
+    const condition = h.updateWhere.mock.calls[0][0] as SQL;
+    const dialect = new PgDialect();
+    const { sql, params } = dialect.sqlToQuery(condition);
+
+    expect(sql).toContain('is_read');
+    expect(sql.toLowerCase()).toContain('and');
+    expect(params).toContain(false);
+  });
+
+  // 위 구조적 검증과 별개로, 실제 재호출 시나리오를 API 응답 레벨에서도 확인한다.
+  // (returning()이 실제 DB라면 isRead=false 조건 때문에 2차 호출에서 빈 배열을
+  // 돌려줄 것 — 여기서는 그 DB 동작을 mock으로 흉내 낸다)
+  it('같은 id로 mark-read를 연속 2번 호출하면 2차는 updated:0이고 재방송하지 않는다 (BUG-016)', async () => {
+    const { POST } = await import('@/app/api/notifications/mark-read/route');
+
+    const makeReq = () =>
+      new NextRequest('http://localhost/api/notifications/mark-read', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ ids: [1] }),
+      });
+
+    h.updateReturning.mockResolvedValueOnce([{ id: 1 }]); // 1차: 아직 안 읽음 → 1건 변경
+    const res1 = await POST(makeReq());
+    expect((await res1.json()).data.updated).toBe(1);
+    expect(mockWsBroadcast).toHaveBeenCalledWith('notification:read', { ids: [1] });
+
+    mockWsBroadcast.mockClear();
+    h.updateReturning.mockResolvedValueOnce([]); // 2차: isRead=false 조건에 걸려 0건
+    const res2 = await POST(makeReq());
+    expect((await res2.json()).data.updated).toBe(0);
+    expect(mockWsBroadcast).not.toHaveBeenCalled();
   });
 
   it('ids를 주면 실제로 바뀐 행만큼 updated를 세고, notification:read {ids}를 방송한다', async () => {

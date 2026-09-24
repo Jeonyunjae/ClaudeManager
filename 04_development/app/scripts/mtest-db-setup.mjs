@@ -14,10 +14,14 @@
  * 아니면 아무것도 하지 않고 즉시 중단한다 — 운영 DB(`claudemanager`)를 잘못 겨냥해
  * 마이그레이션·시드를 돌리는 사고를 막기 위함이다.
  *
- * 이 스크립트는 운영 DB에 절대 연결하지 않는다. `MTEST_ADMIN_URL`은 CREATE
- * DATABASE 권한 확인용으로 같은 서버의 "기존" DB(예: 운영 `claudemanager`)에
- * 붙지만, 거기서 실행하는 쿼리는 `pg_database` 조회와 `CREATE DATABASE`뿐이고
- * 대상 DB 이름은 이 스크립트 안에 하드코딩된 `claudemanager_mtest`뿐이다.
+ * (BUG-011 주석 정정) 이 스크립트는 실제로는 **관리 접속(`MTEST_ADMIN_URL`)으로
+ * 같은 Postgres 서버의 기존 DB에 연결한다** — 사용법 예시처럼 그 기존 DB는 운영
+ * `claudemanager`일 수 있다. "운영 DB에 연결하지 않는다"는 옛 설명은 부정확했다.
+ * 실제 안전장치는 연결 여부가 아니라 **그 연결에서 실행하는 쿼리의 범위**다:
+ * `pg_database` 조회와 `CREATE DATABASE "claudemanager_mtest"`(하드코딩된 리터럴)
+ * 뿐이며, 마이그레이션·시드 등 데이터를 다루는 모든 작업은 전부 별도의
+ * `DATABASE_URL`(검증을 통과한 `claudemanager_mtest`) 접속으로만 수행한다 — 즉
+ * 관리 접속에서는 운영 DB의 스키마·데이터를 절대 읽거나 쓰지 않는다.
  *
  * 사용법:
  *   MTEST_ADMIN_URL="postgresql://claudemanager:claudemanager@127.0.0.1:5434/claudemanager" \
@@ -46,6 +50,14 @@ const WORK_DIR = '/tmp/cm-mtest/work';
 const MTEST_ADMIN_URL = process.env.MTEST_ADMIN_URL;
 const DATABASE_URL = process.env.DATABASE_URL;
 
+/**
+ * DB 접속 URL의 비밀번호를 마스킹한다 (SEC-002) — 실패 메시지·로그에 그대로 찍히지 않게 한다.
+ * `scheme://user:password@host` 형태를 `scheme://user:***@host`로 바꾼다.
+ */
+function maskDbUrl(text) {
+  return String(text).replace(/:\/\/([^:@/\s]+):([^@\s]*)@/g, '://$1:***@');
+}
+
 function fail(message) {
   console.error(`[mtest-db-setup] ${message}`);
   process.exit(1);
@@ -56,7 +68,7 @@ function dbNameOf(connectionString, label) {
   try {
     url = new URL(connectionString);
   } catch {
-    fail(`${label}이(가) 올바른 접속 URL이 아니다: ${connectionString}`);
+    fail(`${label}이(가) 올바른 접속 URL이 아니다: ${maskDbUrl(connectionString)}`);
   }
   return url.pathname.replace(/^\//, '');
 }
@@ -166,6 +178,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('[mtest-db-setup] 실패:', error.message);
+  // SEC-002: pg 드라이버 에러 메시지에 접속 URL(비밀번호 포함)이 섞여 나올 수 있어 마스킹한다.
+  console.error('[mtest-db-setup] 실패:', maskDbUrl(error.message));
   process.exit(1);
 });

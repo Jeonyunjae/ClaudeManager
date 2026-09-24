@@ -29,7 +29,19 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_LOCAL="$APP_DIR/.env.local"
 
-if ! node "$APP_DIR/scripts/mtest-env-check.mjs" "$ENV_LOCAL"; then
+# BUG-001: 운영 .env.local과 비밀값·DB명이 같은지 비교해 두 번째 안전망을 건다.
+# 경로 하드코딩은 이 mtest 전용 스크립트에 한해서만 둔다 — 그 외 코드는 항상
+# 환경변수/설정으로 경로를 받는다. MTEST_PROD_ENV_FILE이 환경에 있으면 그것을
+# 우선하고, 없으면 이 기본 경로가 실제로 "존재할 때만" 비교에 쓴다(없는 환경에서
+# 굳이 실패시키지 않기 위함 — mtest-env-check.mjs 쪽에서도 파일이 없으면 그냥
+# 건너뛴다).
+DEFAULT_PROD_ENV_FILE="/home/dmoa/Desktop/00.jyj/01.project/02.LLMManager/04_development/app/.env.local"
+PROD_ENV_ARG="${MTEST_PROD_ENV_FILE:-}"
+if [ -z "$PROD_ENV_ARG" ] && [ -f "$DEFAULT_PROD_ENV_FILE" ]; then
+  PROD_ENV_ARG="$DEFAULT_PROD_ENV_FILE"
+fi
+
+if ! node "$APP_DIR/scripts/mtest-env-check.mjs" "$ENV_LOCAL" "$PROD_ENV_ARG"; then
   echo "[mtest-start] 안전 검증 실패로 기동을 거부한다 (DF-008 재발 방지)." >&2
   exit 1
 fi

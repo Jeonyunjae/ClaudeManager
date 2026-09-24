@@ -61,6 +61,9 @@ export const SERVER_EVENTS = [
   'note:updated',
   'log:new',
   'terminal:output',
+  'notification:read',
+  'chat:tool',
+  'chat:queue',
 ] as const;
 
 // Client-to-Server event types

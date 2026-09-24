@@ -140,8 +140,8 @@ class ApiClient {
     return this.request<ApiResponse<T>>('PATCH', path, body);
   }
 
-  async del<T>(path: string): Promise<ApiResponse<T>> {
-    return this.request<ApiResponse<T>>('DELETE', path);
+  async del<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
+    return this.request<ApiResponse<T>>('DELETE', path, body);
   }
 }
 

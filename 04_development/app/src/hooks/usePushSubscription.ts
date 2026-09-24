@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import apiClient, { handleUnauthorized } from '@/lib/api';
+import apiClient from '@/lib/api';
 import { isIOS, isStandalone } from '@/lib/platform';
 
 /** PushState (DES-009 §상태 코드, DES-007 §2) */
@@ -151,29 +151,12 @@ async function getRegistration(): Promise<ServiceWorkerRegistration | null> {
 /**
  * 구독 해제 DELETE 호출.
  *
- * **결함 등재 (DEF-B5-02)**: `src/lib/api.ts`의 `apiClient.del()`은 요청 바디를 받지 않지만
  * DES-002 §`/api/notifications/subscribe`는 `DELETE { endpoint }` 바디를 요구한다.
- * `api.ts`는 이번 배치의 쓰기 허용 경로 밖이라 직접 고치지 않고, 여기서만 `fetch`로 바디를 보내며
- * 401 처리는 `api.ts`가 내보내는 `handleUnauthorized`를 그대로 재사용해 동작을 통일했다.
- * Agent에게 `apiClient.del(path, body?)` 시그니처 확장을 보고한다.
+ * DF-012 해소: `apiClient.del(path, body?)`가 바디를 받게 확장되어(`src/lib/api.ts`), 더 이상
+ * `fetch`로 우회하지 않고 다른 화면과 같은 401 처리·인증 헤더 경로를 그대로 재사용한다.
  */
-async function deleteSubscriptionByEndpoint(endpoint: string): Promise<void> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const response = await fetch(SUBSCRIBE_PATH, {
-    method: 'DELETE',
-    headers,
-    body: JSON.stringify({ endpoint }),
-  });
-
-  if (!response.ok) {
-    if (response.status === 401 && typeof window !== 'undefined') {
-      handleUnauthorized(SUBSCRIBE_PATH, window.location, localStorage);
-    }
-    throw new Error('unsubscribe request failed');
-  }
+export async function deleteSubscriptionByEndpoint(endpoint: string): Promise<void> {
+  await apiClient.del(SUBSCRIBE_PATH, { endpoint });
 }
 
 export type UsePushSubscriptionResult = {

@@ -2,15 +2,25 @@
  * usePushSubscription 순수 함수 단위 테스트 — FR-010, DES-007 §2
  * (환경이 node이므로 훅 자체가 아니라 resolvePushState·runSubscribeFlow·runUnsubscribeFlow만 검증한다)
  */
-import { describe, it, expect, vi } from 'vitest';
-import {
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const mockDel = vi.fn();
+
+vi.mock('@/lib/api', () => ({
+  default: {
+    del: mockDel,
+  },
+}));
+
+const {
   resolvePushState,
   runSubscribeFlow,
   runUnsubscribeFlow,
   urlBase64ToUint8Array,
-  type SubscribeDeps,
-  type UnsubscribeDeps,
-} from '@/hooks/usePushSubscription';
+  deleteSubscriptionByEndpoint,
+} = await import('@/hooks/usePushSubscription');
+type SubscribeDeps = Parameters<typeof runSubscribeFlow>[0];
+type UnsubscribeDeps = Parameters<typeof runUnsubscribeFlow>[0];
 
 const BASE = {
   hasPushManager: true,
@@ -221,5 +231,30 @@ describe('runUnsubscribeFlow', () => {
 
     expect(result.state).toBe('subscribed');
     expect(result.error).toBe('해제 실패');
+  });
+});
+
+// DF-012: apiClient.del(path)이 바디를 받지 못해 fetch로 우회했던 부분을 제거하고
+// apiClient.del(path, body)로 되돌린 뒤에도 같은 엔드포인트·바디로 호출하는지 검증한다.
+describe('deleteSubscriptionByEndpoint', () => {
+  beforeEach(() => {
+    mockDel.mockReset();
+    mockDel.mockResolvedValue({ data: {} });
+  });
+
+  it('apiClient.del을 /api/notifications/subscribe에 { endpoint } 바디로 호출한다', async () => {
+    await deleteSubscriptionByEndpoint('https://push.example/ep');
+
+    expect(mockDel).toHaveBeenCalledWith('/api/notifications/subscribe', {
+      endpoint: 'https://push.example/ep',
+    });
+  });
+
+  it('apiClient.del이 실패하면 예외가 그대로 전파된다 (runUnsubscribeFlow가 흡수)', async () => {
+    mockDel.mockRejectedValue(new Error('unsubscribe failed'));
+
+    await expect(deleteSubscriptionByEndpoint('https://push.example/ep')).rejects.toThrow(
+      'unsubscribe failed'
+    );
   });
 });

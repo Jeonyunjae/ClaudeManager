@@ -157,13 +157,19 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
   },
 
   openAgent: async (agentId) => {
-    set({ isOpen: true, isLoading: true, activeTab: 'info' });
+    // 팝업 안에서 설정을 바꾼 뒤 같은 에이전트를 다시 부르는 것은 새로고침이다 — 보던 탭을 유지한다.
+    const { isOpen, selectedAgent, activeTab } = get();
+    const refreshing = isOpen && selectedAgent?.id === agentId;
+    set({ isOpen: true, isLoading: true });
     try {
       const res = await apiClient.get<AgentDetail>(`/api/agents/${agentId}`);
-      set({ selectedAgent: res.data, isLoading: false });
+      // 새로 열 때는 대화 탭부터. Part/Instance는 대화 탭이 없어 정보 탭 (getTabsForRole 참조)
+      const noChat = res.data.role === 'part' || res.data.role === 'instance';
+      const tab: ActiveTab = refreshing ? activeTab : noChat ? 'info' : 'chat';
+      set({ selectedAgent: res.data, isLoading: false, activeTab: tab });
       get().fetchConversations(agentId);
     } catch {
-      set({ isLoading: false });
+      set({ isLoading: false, ...(refreshing ? {} : { activeTab: 'info' as ActiveTab }) });
     }
   },
 

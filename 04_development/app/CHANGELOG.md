@@ -59,3 +59,10 @@
 - `sendPushNotification`이 CJS 패키지 `web-push`의 ESM 동적 import 결과(`{ default: { setVapidDetails, sendNotification, ... } }`)를 언랩하지 않아 `webpush.setVapidDetails`·`webpush.sendNotification`이 항상 `undefined`가 되고, 매번 "web-push not available"로 오도해 실제 발송이 100% 무동작하던 문제 — `mod.default ?? mod`로 언랩 후 API 존재를 확인하고, 모듈 로드 실패와 발송 실패를 구분해 로그(발송 실패 로그는 엔드포인트 전체·키 대신 호스트명·statusCode만 기록)한다 (BUG-017)
 - `POST /api/notifications/mark-read`의 ids 지정 분기가 `isRead=false` 조건 없이 매칭해, 이미 읽은 알림 id로 재호출해도 매번 `updated`가 변경 건수처럼 보고되고 `notification:read`가 불필요하게 재방송되던 문제 — ids 분기에도 '전체' 분기와 동일하게 `isRead=false` 조건을 걸고, 두 분기 모두 실제 변경 행이 있을 때만 방송한다 (BUG-016)
 - `mtest-start.sh`가 `env -i`로 넘기는 `PATH`를 기동 셸의 `PATH`에만 의존해, claude CLI 위치(`~/.local/bin`)가 빠진 좁은 PATH로 재기동되면 `agent-manager.ts`의 `spawn('claude', ...)`가 매 채팅마다 ENOENT로 실패하던 문제 — `~/.local/bin`(존재할 때만)과 node 실행 경로를 명시적으로 PATH 앞에 붙이고, `claude` CLI를 못 찾으면 기동 시 경고를 남긴다. DF-008 격리(`env -i`로 운영 env 차단)는 그대로 유지한다 (BUG-015)
+
+## [Unreleased] - operate 단계 결함 수정 (2026-09-25, `feat/mobile-web`)
+
+### Fixed
+- `globals.css`의 레이어 밖 전역 초기화 `* { margin:0; padding:0 }`가 Tailwind v4 유틸리티(`p-*`·`m-*`·`space-*`)보다 우선 적용되어 모바일 4개 화면의 여백·카드 안쪽 여백·말풍선 여백이 전부 0으로 뭉개지던 문제 — 해당 규칙을 `@layer base`로 옮겨 유틸리티 클래스가 이기도록 정정 (BUG-024)
+- 운영(`next dev`) 실행 시 Next 개발 표시기("N" 버튼)가 화면 좌하단 모바일 하단 탭 [대화]를 가리던 문제 — `next.config.ts`에 `devIndicators: false` 추가 (BUG-025)
+- 모바일 대화 화면 헤더가 서버 `statusMessage` 영어 원문(`Completed`·`Working...`·`Error occurred` 등)을 그대로 표시하던 문제 — `lib/mobile-format.ts`에 알려진 값만 한국어로 바꾸는 `statusMessageLabel()`을 추가하고 헤더에 적용, 모르는 값은 원문 그대로 표시 (BUG-026)

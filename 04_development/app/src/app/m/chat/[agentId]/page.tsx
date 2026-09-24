@@ -9,7 +9,7 @@ import { useWsConnectionStatus } from '@/hooks/useMobileRealtime';
 import { ConnectionBar } from '@/components/mobile/ConnectionBar';
 import { ConversationView } from '@/components/mobile/ConversationView';
 import { MessageComposer } from '@/components/mobile/MessageComposer';
-import { agentInitial, agentRoleLabel, agentStatusLabel } from '@/lib/mobile-format';
+import { agentInitial, agentRoleLabel, agentStatusLabel, statusMessageLabel } from '@/lib/mobile-format';
 
 /** SCR-M02 대화 `/m/chat/[agentId]` — DES-006, FR-004·FR-005·FR-007 */
 export default function MobileConversationPage() {
@@ -89,7 +89,7 @@ export default function MobileConversationPage() {
           <p className="text-sm font-medium text-[var(--text-primary)] truncate">{agent.name}</p>
           <p className="text-xs text-[var(--text-tertiary)] truncate">
             {agentRoleLabel(agent.role)} · {agentStatusLabel(agent.status)}
-            {agent.statusMessage ? `: ${agent.statusMessage}` : ''}
+            {agent.statusMessage ? `: ${statusMessageLabel(agent.statusMessage)}` : ''}
           </p>
         </div>
       </header>

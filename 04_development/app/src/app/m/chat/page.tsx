@@ -7,8 +7,9 @@ import { useAgentStore } from '@/stores/agentStore';
 import { useWsConnectionStatus } from '@/hooks/useMobileRealtime';
 import { InboxSection } from '@/components/mobile/InboxSection';
 import { AgentList } from '@/components/mobile/AgentList';
+import { InstallBanner } from '@/components/mobile/InstallBanner';
 
-/** SCR-M01 대화 목록 `/m/chat` — DES-006, FR-001·FR-004·FR-006 */
+/** SCR-M01 대화 목록 `/m/chat` — DES-006, FR-001·FR-003(배너)·FR-004·FR-006 */
 export default function MobileChatListPage() {
   const router = useRouter();
   const connected = useWsConnectionStatus();
@@ -38,6 +39,8 @@ export default function MobileChatListPage() {
           {connected ? '연결' : '끊김'}
         </span>
       </header>
+
+      <InstallBanner />
 
       <div className="flex-1 overflow-y-auto">
         <InboxSection

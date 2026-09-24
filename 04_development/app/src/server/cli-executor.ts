@@ -10,9 +10,10 @@ import { eq } from 'drizzle-orm';
 import fs from 'fs';
 import path from 'path';
 import db from '../lib/db';
-import { chatMessages, agents, parts, costRecords, auditLogs, notifications } from '../lib/schema';
+import { chatMessages, agents, parts, costRecords, auditLogs } from '../lib/schema';
 import { agentManager } from '../lib/agent-manager';
 import { loadMainSkill, parseActions } from '../lib/skill-loader';
+import { createNotification } from '../lib/notify';
 import { broadcast } from './ws-server';
 
 function ts() {
@@ -250,24 +251,14 @@ export async function processChatInBackground(req: CliExecutionRequest): Promise
       createdAt: new Date().toISOString(),
     });
 
-    // Notification
+    // Notification (lib/notify.ts -- insert -> notification:new broadcast -> push fire-and-forget)
     const preview = responseText.length > 80
       ? responseText.substring(0, 80) + '\u2026'
       : responseText;
-    const [notifResult] = await db.insert(notifications).values({
-      type: 'info',
-      title: `${agentName} 응답 완료`,
-      message: preview,
-      sourceAgentId: agentId,
-    }).returning({ id: notifications.id });
-    broadcast('notification:new', {
-      notification: {
-        id: notifResult.id,
-        type: 'info',
-        title: `${agentName} 응답 완료`,
-        message: preview,
-      },
-    });
+    await createNotification(
+      { type: 'info', title: `${agentName} 응답 완료`, message: preview, sourceAgentId: agentId },
+      { broadcast }
+    );
 
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -297,21 +288,16 @@ export async function processChatInBackground(req: CliExecutionRequest): Promise
       createdAt: new Date().toISOString(),
     });
 
-    // Error notification
-    const [errNotif] = await db.insert(notifications).values({
-      type: 'error',
-      title: `${agentName} 응답 오류`,
-      message: errorMsg.length > 80 ? errorMsg.substring(0, 80) + '\u2026' : errorMsg,
-      sourceAgentId: agentId,
-    }).returning({ id: notifications.id });
-    broadcast('notification:new', {
-      notification: {
-        id: errNotif.id,
+    // Error notification (lib/notify.ts)
+    await createNotification(
+      {
         type: 'error',
         title: `${agentName} 응답 오류`,
         message: errorMsg.length > 80 ? errorMsg.substring(0, 80) + '\u2026' : errorMsg,
+        sourceAgentId: agentId,
       },
-    });
+      { broadcast }
+    );
   }
 }
 

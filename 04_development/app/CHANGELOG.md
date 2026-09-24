@@ -38,3 +38,21 @@
 - 테스트 인스턴스(`claudemanager-mtest`)가 운영 env를 상속해 운영 DB에 접속한 사고 방지 — `env -i` 격리 + `.env.local` 검증 (DF-008, 대표 결정 D-15 대기 항목 별도 존재)
 - 실시간(WS) `SERVER_EVENTS`에 누락되어 있던 `notification:read`·`chat:tool`·`chat:queue` 브로드캐스트 추가
 - `allowedDevOrigins`에 Tailscale HTTPS 호스트 추가
+
+## [Unreleased] - test 단계 결함 수정 (2026-09-24, `feat/mobile-web`)
+
+### Fixed
+- (치명) 서버 내부 WS 브리지(`ws-bridge.ts`)가 `localhost:3001` 상수로 고정되어 테스트 인스턴스(WS 3111)의 채팅 실행·방송이 운영 WS로 나가려던 문제 — `process.env.WS_PORT`를 우선 읽도록 수정(운영은 값이 그대로 3001이라 동작 무변경), 클라이언트 `ws.ts`의 `buildWsUrl`도 HTTP 접속 시 `NEXT_PUBLIC_WS_PORT`를 우선 사용, `mtest-env-check.mjs`에 비밀값(`WS_BROADCAST_SECRET`·`JWT_SECRET`) 필수·비기본값 검증과 운영 `.env.local`과의 비교 검증 추가 (BUG-001, DF-013 근본 원인)
+- `mtest-env-check.mjs`가 `.env.local`만 보고 우선순위가 더 높은 `.env.development.local`·`.env.development`·`.env`의 존재를 확인하지 않아 fail-open 가능하던 문제, `export KEY=` 형식 줄 미인식 문제 (BUG-003)
+- `mtest-env-check.mjs`·`mtest-db-setup.mjs`의 실패 메시지에 DB 접속 URL 비밀번호가 그대로 노출되던 문제 — 마스킹(`://user:***@host`) 적용 (SEC-002)
+- 로그인 `next` 복귀 경로 검증(`safe-next.ts`)이 `%`-인코딩된 백슬래시·탭(`/%5Cevil.com`, `/%09/evil.com`)으로 감춘 오픈 리다이렉트를 걸러내지 못하던 문제 — 디코드 후 재검증 + `new URL()` 기반 origin 재확인으로 강화 (SEC-001)
+- 데스크톱 TopNav에서 알림(targetUrl이 `/m/...`인 모바일 전용 경로)을 클릭하면 모바일 셸로 이동하던 문제 — `desktopTargetFor()`로 판정해 읽음 처리만 하고 이동하지 않음 (BUG-002, NFR-001)
+- Postgres `now()::text` 형식(공백 구분자·마이크로초·`+HH`/`+HH:MM` 오프셋)이 일부 브라우저에서 Invalid Date로 파싱되어 "NaN"이 표시되던 문제 — `parseFlexibleTimestamp()`로 ISO 정규화 후 파싱, 실패 시 빈 문자열 (BUG-004)
+- 알림 배지(`unreadCount`)가 서버 값이 아니라 최근 30건 목록 안에서 다시 계산되어 30건 밖의 안 읽은 알림이 배지에서 누락되던 문제 — 서버 `unreadCount`를 그대로 쓰고, 읽음 처리 시에도 목록 재계산이 아니라 실제 변경 건수만큼만 차감 (BUG-005)
+- `GET /api/notifications` 응답의 `pagination.total`·`unreadCount`가 Postgres `count(*)`(bigint) 드라이버 매핑으로 문자열로 내려오던 문제 — `Number()`로 명시 변환 (BUG-013)
+- 재연결 시 REST 재조회와 WS `chat:message` 수신이 겹치면 같은 메시지가 대화창에 중복 표시되던 문제 — `mobileChatStore.applyMessage`에 id 기준 중복 제거 추가 (BUG-008)
+- 웹 푸시 권한 요청 창을 닫아 `'default'`가 반환된 경우에도 `denied`로 처리되어 [푸시 켜기] 버튼이 다시 나타나지 않던 문제 — `denied`는 명시적 거부일 때만, 그 외는 `default` 유지 (BUG-009)
+- 모바일 대화 입력창에서 한글 등 IME 조합 중 Enter를 누르면 마지막 글자가 중복·잘리던 문제, 터치 기기에서 Enter가 줄바꿈 없이 바로 전송되어 여러 줄 메시지를 쓸 수 없던 문제 — `decideEnterAction()`으로 조합 중·터치 기기에서는 Enter를 기본 동작(조합 확정/줄바꿈)에 맡기고, 터치 기기는 전송 버튼으로만 전송 (BUG-010)
+- CLI 응답을 저장·방송까지 마친 뒤 호출하는 알림 생성(`createNotification`)이 실패하면 예외가 바깥 catch로 빠져 이미 성공한 응답을 "[Error]"로 덮어쓰던 문제 — 알림 생성만 별도 try/catch로 감싸 실패를 로그로만 남김 (BUG-012)
+- `POST /api/notifications/subscribe`가 endpoint 스킴·호스트를 검증하지 않아 인증된 사용자가 서버로 하여금 임의 URL에 POST하게 만들 수 있던 문제(SSRF) — https + 알려진 푸시 서비스 호스트(Apple/FCM/Windows/Mozilla)만 허용, 그 외는 400 VALIDATION_ERROR (SEC-003)
+- `mtest-db-setup.mjs` 주석이 "운영 DB에 절대 연결하지 않는다"고 설명해 실제 동작(관리 URL로 같은 서버의 기존 DB에 접속해 조회·`CREATE DATABASE`만 수행 — 그 기존 DB가 운영 `claudemanager`일 수 있음)과 어긋나던 문제 — 주석을 실제 동작에 맞게 정정 (BUG-011, 일부 — 인라인 style·react-markdown 지연 로딩은 다음 Phase)

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { decideEnterAction } from '@/lib/composer-keys';
 
 type MessageComposerProps = {
   sending: boolean;
@@ -51,10 +52,22 @@ export function MessageComposer({ sending, onSend }: MessageComposerProps) {
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+
+    // BUG-010: IME(한글 등) 조합 중 Enter, 터치 기기의 Enter는 전송하지 않는다.
+    const isCoarsePointer =
+      typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    const action = decideEnterAction({
+      isComposing: e.nativeEvent.isComposing,
+      keyCode: e.keyCode,
+      isCoarsePointer,
+    });
+
+    if (action === 'send') {
       e.preventDefault();
       handleSubmit();
     }
+    // action === 'default': 조합 확정(IME) 또는 줄바꿈(터치 기기)에 기본 동작을 맡긴다.
   }
 
   return (

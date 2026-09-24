@@ -1,23 +1,36 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
+import { useViewMode } from '@/hooks/useViewMode';
+import { safeNextPath } from '@/lib/safe-next';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, isAuthenticated, isLoading, error } = useAuthStore();
+  const { shouldUseMobile } = useViewMode();
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
-      // /workspace는 폐기된 경로로 /dashboard 로 재리다이렉트만 한다.
-      // 한 단계 건너뛰어 곧바로 대시보드로 보낸다.
-      router.replace('/dashboard');
+      // next 파라미터(같은 출처 상대 경로만)가 있으면 원래 화면으로 복귀한다 (NFR-003, RISK-04).
+      // 없으면 폭<768이면 /m/chat, 아니면 기존 /dashboard.
+      const next = safeNextPath(searchParams.get('next'));
+      router.replace(next ?? (shouldUseMobile ? '/m/chat' : '/dashboard'));
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, searchParams, shouldUseMobile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +49,8 @@ export default function LoginPage() {
         justifyContent: 'center',
         overflow: 'hidden',
         position: 'relative',
+        padding: '0 16px',
+        boxSizing: 'border-box',
       }}
     >
       {/* Background pattern */}
@@ -79,7 +94,8 @@ export default function LoginPage() {
         style={{
           position: 'relative',
           zIndex: 1,
-          width: 400,
+          width: '100%',
+          maxWidth: 400,
           background: 'var(--bg-card)',
           borderRadius: 24,
           boxShadow: '0 20px 60px rgba(0,0,0,0.12)',

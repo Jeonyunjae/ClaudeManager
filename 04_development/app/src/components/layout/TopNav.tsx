@@ -7,6 +7,8 @@ import { useNotificationStore } from '@/stores/notificationStore';
 import { useApprovalStore } from '@/stores/approvalStore';
 import { useAuthStore } from '@/stores/authStore';
 import { formatRelativeTime } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/useMediaQuery';
+import { useViewMode } from '@/hooks/useViewMode';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard' },
@@ -21,10 +23,18 @@ export function TopNav() {
   const { notifications, unreadCount, markRead, markAllRead } = useNotificationStore();
   const { pendingList } = useApprovalStore();
   const { logout } = useAuthStore();
+  const isMobileWidth = useIsMobile();
+  const { setViewMode } = useViewMode();
   const [showProfile, setShowProfile] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  const handleMobileView = () => {
+    // ForcedDesktop 상태에서 폭이 좁은 화면(예: 휴대폰)일 때 모바일 셸로 돌아가는 경로 (FR-002).
+    setViewMode('auto');
+    router.push('/m/chat');
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -86,6 +96,22 @@ export function TopNav() {
 
       {/* Right section */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* 모바일 보기 (FR-002, 폭<768일 때만 — 예: ForcedDesktop 상태에서 휴대폰으로 열었을 때) */}
+        {isMobileWidth && (
+          <button
+            type="button"
+            onClick={handleMobileView}
+            aria-label="모바일 보기"
+            style={{
+              padding: '6px 12px', borderRadius: 20, border: '1px solid var(--border-light, #E5E7EB)',
+              fontSize: 12, fontWeight: 500, color: 'var(--text-secondary, #6B7280)',
+              background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            모바일 보기
+          </button>
+        )}
+
         {/* Approval badge */}
         {pendingList.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 9999, background: 'var(--status-pending-bg, #FFF8EB)', color: 'var(--status-pending-text, #D48806)', fontSize: 12, fontWeight: 500 }}>

@@ -1,12 +1,22 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAgentStore } from '@/stores/agentStore';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useViewMode } from '@/hooks/useViewMode';
 
 export default function MobileStatusPage() {
+  const router = useRouter();
+  const { setViewMode } = useViewMode();
   const { tree, fetchTree } = useAgentStore();
+
+  const handleDesktopView = (): void => {
+    // EVT-M04-2: ForcedDesktop으로 전환 — 같은 세션 동안 자동으로 모바일로 되돌아가지 않는다 (FR-002).
+    setViewMode('desktop');
+    router.push('/dashboard');
+  };
 
   useEffect(() => {
     fetchTree();
@@ -69,9 +79,13 @@ export default function MobileStatusPage() {
         )}
 
         <div className="text-center pt-4">
-          <a href="/workspace" className="text-xs text-[var(--text-link)]">
-            데스크톱에서 자세히 보기
-          </a>
+          <button
+            type="button"
+            onClick={handleDesktopView}
+            className="text-xs text-[var(--text-link)] bg-transparent border-none cursor-pointer"
+          >
+            데스크톱 화면으로 보기
+          </button>
         </div>
       </div>
     </div>

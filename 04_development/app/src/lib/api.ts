@@ -22,6 +22,44 @@ type PaginatedResponse<T> = {
   };
 };
 
+/** `handleUnauthorized`가 필요로 하는 `window.location`의 최소 형태 (테스트 용이) */
+export type LocationLike = {
+  pathname: string;
+  search: string;
+  replace: (url: string) => void;
+};
+
+/** `handleUnauthorized`가 필요로 하는 storage의 최소 형태 (테스트 용이) */
+export type StorageLike = {
+  removeItem: (key: string) => void;
+};
+
+/**
+ * API 401 응답 처리 (NFR-003, EVT-SH-3).
+ *
+ * `requestPath`(방금 401을 받은 API 경로)가 `/api/auth/`로 시작하면
+ * (로그인 자체가 401을 반환한 경우 등) 아무 것도 하지 않는다.
+ * 그 외에는 토큰을 지우고 현재 화면(`location`)이 이미 `/login`·`/setup`이면
+ * `next` 없이, 아니면 현재 경로를 `next`로 붙여 로그인 화면으로 이동한다.
+ */
+export function handleUnauthorized(
+  requestPath: string,
+  location: LocationLike,
+  storage: StorageLike
+): void {
+  if (requestPath.startsWith('/api/auth/')) return;
+
+  storage.removeItem('auth_token');
+
+  if (location.pathname === '/login' || location.pathname === '/setup') {
+    location.replace('/login');
+    return;
+  }
+
+  const next = encodeURIComponent(`${location.pathname}${location.search}`);
+  location.replace(`/login?next=${next}`);
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -66,6 +104,10 @@ class ApiClient {
     const json = await response.json();
 
     if (!response.ok) {
+      if (response.status === 401 && typeof window !== 'undefined') {
+        handleUnauthorized(path, window.location, localStorage);
+      }
+
       const error = json as ApiError;
       throw new ApiClientError(
         error.error?.message || 'Request failed',

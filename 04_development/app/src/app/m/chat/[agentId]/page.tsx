@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAgentStore } from '@/stores/agentStore';
 import { useInboxStore } from '@/stores/inboxStore';
@@ -16,11 +16,17 @@ export default function MobileConversationPage() {
   const router = useRouter();
   const params = useParams<{ agentId: string }>();
   const agentId = params.agentId;
-  const connected = useWsConnectionStatus();
 
   const { initialized, isLoading: treeLoading, getAgent, fetchTree } = useAgentStore();
   const { fetchInbox } = useInboxStore();
   const { load, loadMore, send, resend, getAgentState } = useMobileChatStore();
+
+  // EVT-SH-2: 재연결 성공 시 대화 화면은 conversations 1페이지를 재조회해 누락분을 채운다 (DES-007 §4).
+  const connected = useWsConnectionStatus(
+    useCallback(() => {
+      load(agentId);
+    }, [agentId, load])
+  );
 
   const agent = getAgent(agentId);
   const chatState = getAgentState(agentId);
@@ -99,6 +105,7 @@ export default function MobileConversationPage() {
         loadingMore={chatState.loadingMore}
         loading={chatState.loading}
         error={chatState.error}
+        loadMoreError={chatState.loadMoreError}
         onLoadMore={() => loadMore(agentId)}
         onRetry={() => load(agentId)}
         onResend={(messageId) => resend(agentId, messageId)}

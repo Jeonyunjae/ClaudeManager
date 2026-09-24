@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useInboxStore } from '@/stores/inboxStore';
 import { useAgentStore } from '@/stores/agentStore';
@@ -12,10 +12,17 @@ import { InstallBanner } from '@/components/mobile/InstallBanner';
 /** SCR-M01 대화 목록 `/m/chat` — DES-006, FR-001·FR-003(배너)·FR-004·FR-006 */
 export default function MobileChatListPage() {
   const router = useRouter();
-  const connected = useWsConnectionStatus();
 
   const { items, loading: inboxLoading, error: inboxError, fetchInbox, ack } = useInboxStore();
   const { tree, isLoading: treeLoading, fetchTree } = useAgentStore();
+
+  // EVT-SH-2: 재연결 성공 시 목록 화면은 inbox·tree를 재조회한다.
+  const connected = useWsConnectionStatus(
+    useCallback(() => {
+      fetchInbox();
+      fetchTree();
+    }, [fetchInbox, fetchTree])
+  );
 
   const waitingAgentIds = new Set(items.map((i) => i.agentId));
 

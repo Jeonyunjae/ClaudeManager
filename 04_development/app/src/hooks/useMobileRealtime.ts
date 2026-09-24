@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import wsClient from '@/lib/ws';
 import { useMobileChatStore } from '@/stores/mobileChatStore';
 import { useInboxStore } from '@/stores/inboxStore';
@@ -80,20 +80,68 @@ export function useMobileRealtime(): void {
 }
 
 /**
+ * EVT-SH-2: 끊김→연결 전이일 때만 참 (그 외 전이는 재조회하지 않는다).
+ * 순수 로직으로 분리해 테스트 용이성을 확보한다.
+ */
+export function isReconnectTransition(prevConnected: boolean, nextConnected: boolean): boolean {
+  return prevConnected === false && nextConnected === true;
+}
+
+/**
+ * 앱이 백그라운드에서 돌아왔을 때(visibilitychange) 연결을 다시 시도해야 하는지 판정한다
+ * (FR-005 수용 기준 "백그라운드에서 돌아옴 → 연결 복구"). 순수 로직 — 테스트 용이.
+ */
+export function shouldReconnectOnVisible(visibilityState: string, isConnected: boolean): boolean {
+  return visibilityState === 'visible' && !isConnected;
+}
+
+/**
  * WS 연결 상태 (헤더 StatusDot·ConnectionBar 용, EVT-SH-1·EVT-SH-2).
  * `wsClient.isConnected`는 getter일 뿐 리렌더를 유발하지 않으므로
  * `connection:open`·`connection:close` 이벤트를 구독해 리액트 상태로 옮긴다.
+ *
+ * `onReconnect`를 넘기면 끊김→연결 전이(EVT-SH-2)에서 정확히 한 번 호출된다 —
+ * 호출부는 여기서 "현재 화면 재조회"(대화면이면 conversations 1페이지, 목록이면
+ * inbox·tree)를 수행한다 (DES-007 §4 "(끊김 중) WS 재연결 → (재조회)").
+ *
+ * 탭이 백그라운드에서 돌아올 때(visibilitychange)도 연결 상태를 확인해, 끊긴 채라면
+ * 곧바로 재연결을 시도한다 — 그 결과로 오는 `connection:open`이 위 재조회를 이어서 부른다.
  */
-export function useWsConnectionStatus(): boolean {
+export function useWsConnectionStatus(onReconnect?: () => void): boolean {
   const [connected, setConnected] = useState<boolean>(() => wsClient.isConnected);
+  const connectedRef = useRef(connected);
+  const onReconnectRef = useRef(onReconnect);
 
   useEffect(() => {
-    const offOpen = wsClient.on('connection:open', () => setConnected(true));
-    const offClose = wsClient.on('connection:close', () => setConnected(false));
+    onReconnectRef.current = onReconnect;
+  }, [onReconnect]);
+
+  useEffect(() => {
+    const offOpen = wsClient.on('connection:open', () => {
+      if (isReconnectTransition(connectedRef.current, true)) {
+        onReconnectRef.current?.();
+      }
+      connectedRef.current = true;
+      setConnected(true);
+    });
+    const offClose = wsClient.on('connection:close', () => {
+      connectedRef.current = false;
+      setConnected(false);
+    });
     return () => {
       offOpen();
       offClose();
     };
+  }, []);
+
+  useEffect(() => {
+    function handleVisibility(): void {
+      if (shouldReconnectOnVisible(document.visibilityState, wsClient.isConnected)) {
+        wsClient.connect(localStorage.getItem('auth_token') ?? '');
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
   return connected;

@@ -43,7 +43,9 @@ export function InboxSection({ items, loading, error, onRetry, onAck, onOpen }: 
       )}
 
       {!loading && !error && items.length === 0 && (
-        <p className="text-sm text-[var(--text-tertiary)] py-2">대기 없음</p>
+        <div className="bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--primary-50)] shadow-[var(--shadow-sm)] py-6 flex items-center justify-center">
+          <p className="text-sm text-[var(--text-tertiary)]">대기 없음</p>
+        </div>
       )}
 
       {!loading && !error && items.length > 0 && (
@@ -83,8 +85,9 @@ export function InboxSection({ items, loading, error, onRetry, onAck, onOpen }: 
                   onClick={() => onAck(item.agentId)}
                   aria-label={`${item.agentName} 확인함`}
                   className={cn(
-                    'min-h-[44px] px-3 flex items-center text-xs font-medium text-[var(--primary-600)]',
-                    'hover:bg-[var(--primary-50)] rounded-[var(--radius-md)]'
+                    'min-h-[44px] px-4 flex items-center rounded-[var(--radius-md)]',
+                    'border border-[var(--primary-200)] text-xs font-medium text-[var(--primary-600)]',
+                    'hover:bg-[var(--primary-50)]'
                   )}
                 >
                   확인함

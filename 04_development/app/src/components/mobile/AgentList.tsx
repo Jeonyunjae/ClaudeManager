@@ -55,46 +55,48 @@ export function AgentList({ tree, waitingAgentIds, loading, onOpen }: AgentListP
     <section className="px-4 py-3">
       <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-2">전체 에이전트</h2>
 
-      {loading && <p className="text-sm text-[var(--text-tertiary)] py-2">불러오는 중…</p>}
+      <div className="bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--primary-50)] shadow-[var(--shadow-sm)] overflow-hidden">
+        {loading && <p className="text-sm text-[var(--text-tertiary)] text-center py-4">불러오는 중…</p>}
 
-      {!loading && flat.length === 0 && (
-        <p className="text-sm text-[var(--text-tertiary)] py-2">
-          등록된 에이전트가 없습니다 — 데스크톱에서 Main을 시작하세요
-        </p>
-      )}
+        {!loading && flat.length === 0 && (
+          <p className="text-sm text-[var(--text-tertiary)] text-center py-4">
+            등록된 에이전트가 없습니다 — 데스크톱에서 Main을 시작하세요
+          </p>
+        )}
 
-      {!loading && flat.length > 0 && (
-        <ul className="divide-y divide-[var(--primary-50)]">
-          {flat.map((agent) => (
-            <li key={agent.id}>
-              <button
-                type="button"
-                onClick={() => onOpen(agent.id)}
-                className="w-full min-h-[44px] flex items-center gap-3 py-2 text-left"
-              >
-                <div className="shrink-0 w-8 h-8 rounded-full bg-[var(--primary-100)] flex items-center justify-center">
-                  <span className="text-xs font-bold text-[var(--primary-600)]">{agentInitial(agent.name)}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">{agent.name}</p>
-                  <p className="text-xs text-[var(--text-tertiary)]">{agentRoleLabel(agent.role)}</p>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {waitingAgentIds.has(agent.id) && (
-                    <span
-                      aria-label="답변 대기"
-                      className="w-1.5 h-1.5 rounded-full bg-[var(--status-pending)]"
-                    />
-                  )}
-                  <span className={cn('w-2 h-2 rounded-full', statusDotClass(agent.status))} />
-                  <span className="text-xs text-[var(--text-secondary)]">{agentStatusLabel(agent.status)}</span>
-                  <span className="text-[var(--text-tertiary)]">{'›'}</span>
-                </div>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+        {!loading && flat.length > 0 && (
+          <ul className="divide-y divide-[var(--primary-50)]">
+            {flat.map((agent) => (
+              <li key={agent.id}>
+                <button
+                  type="button"
+                  onClick={() => onOpen(agent.id)}
+                  className="w-full min-h-[44px] flex items-center gap-3 px-4 py-2 text-left"
+                >
+                  <div className="shrink-0 w-8 h-8 rounded-full bg-[var(--primary-100)] flex items-center justify-center">
+                    <span className="text-xs font-bold text-[var(--primary-600)]">{agentInitial(agent.name)}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">{agent.name}</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">{agentRoleLabel(agent.role)}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {waitingAgentIds.has(agent.id) && (
+                      <span
+                        aria-label="답변 대기"
+                        className="w-1.5 h-1.5 rounded-full bg-[var(--status-pending)]"
+                      />
+                    )}
+                    <span className={cn('w-2 h-2 rounded-full', statusDotClass(agent.status))} />
+                    <span className="text-xs text-[var(--text-secondary)]">{agentStatusLabel(agent.status)}</span>
+                    <span className="text-[var(--text-tertiary)]">{'›'}</span>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

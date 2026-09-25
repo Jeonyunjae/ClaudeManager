@@ -106,3 +106,30 @@ export function agentRoleLabel(role: string): string {
 export function agentInitial(name: string): string {
   return name.trim().charAt(0).toUpperCase() || '?';
 }
+
+/**
+ * 서버가 `agent.statusMessage`에 실어 보내는 잘 알려진 영어 원문 -> 한국어 표시 (BUG-026).
+ *
+ * 매핑 대상은 서버 코드에서 실제로 리터럴로 설정하는 값만 포함한다:
+ *   - src/app/api/hooks/event/route.ts: 'Working...' · 'Completed' · 'Error occurred'
+ *   - src/app/api/agents/[id]/route.ts: 'Stopped by user' · 'Started' · 'Restarted'
+ *   - src/app/api/agents/route.ts, src/server/cli-executor.ts: 'Skill assigned'
+ *   - src/lib/agent-queue.ts: 'Promoted from queue'
+ * (`Using tool: ...`처럼 동적으로 조합되는 문자열, 큐 대기 메시지처럼 숫자가 섞인 문자열은
+ * 제외 — 모르는 값이면 원문을 그대로 보여준다.)
+ */
+export const STATUS_MESSAGE_LABELS: Record<string, string> = {
+  'Working...': '작업 중...',
+  Completed: '완료',
+  'Error occurred': '오류 발생',
+  'Stopped by user': '사용자가 중지함',
+  Started: '시작됨',
+  Restarted: '재시작됨',
+  'Skill assigned': '스킬 지정됨',
+  'Promoted from queue': '대기열에서 승격됨',
+};
+
+/** 알려진 영어 statusMessage 원문을 한국어로 바꾼다. 모르는 값은 원문 그대로 반환한다. */
+export function statusMessageLabel(message: string): string {
+  return STATUS_MESSAGE_LABELS[message] ?? message;
+}

@@ -8,6 +8,7 @@ import {
   agentRoleLabel,
   agentInitial,
   parseFlexibleTimestamp,
+  statusMessageLabel,
 } from '@/lib/mobile-format';
 
 describe('mobile-format.ts - formatRelativeTime', () => {
@@ -117,5 +118,26 @@ describe('mobile-format.ts - agentInitial', () => {
   it('빈 문자열은 물음표', () => {
     expect(agentInitial('')).toBe('?');
     expect(agentInitial('   ')).toBe('?');
+  });
+});
+
+// BUG-026: 대화 화면 헤더가 서버 statusMessage 영어 원문을 그대로 보여주던 문제.
+describe('mobile-format.ts - statusMessageLabel (BUG-026)', () => {
+  it('서버가 실제로 보내는 알려진 영어 원문을 한국어로 바꾼다', () => {
+    expect(statusMessageLabel('Working...')).toBe('작업 중...');
+    expect(statusMessageLabel('Completed')).toBe('완료');
+    expect(statusMessageLabel('Error occurred')).toBe('오류 발생');
+    expect(statusMessageLabel('Stopped by user')).toBe('사용자가 중지함');
+    expect(statusMessageLabel('Started')).toBe('시작됨');
+    expect(statusMessageLabel('Restarted')).toBe('재시작됨');
+    expect(statusMessageLabel('Skill assigned')).toBe('스킬 지정됨');
+    expect(statusMessageLabel('Promoted from queue')).toBe('대기열에서 승격됨');
+  });
+
+  it('모르는 값(동적으로 조합된 메시지 포함)은 원문 그대로 반환한다', () => {
+    expect(statusMessageLabel('Using tool: Read')).toBe('Using tool: Read');
+    expect(statusMessageLabel('Queued (1/3 active)')).toBe('Queued (1/3 active)');
+    expect(statusMessageLabel('이미 한글 메시지')).toBe('이미 한글 메시지');
+    expect(statusMessageLabel('')).toBe('');
   });
 });

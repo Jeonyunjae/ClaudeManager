@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useMobileRealtime } from '@/hooks/useMobileRealtime';
+import { usePreventZoom } from '@/hooks/usePreventZoom';
 import { useApprovalStore } from '@/stores/approvalStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useInboxStore } from '@/stores/inboxStore';
@@ -28,6 +29,7 @@ export default function MobileLayout({
   const { isAuthenticated } = useAuth(`/login?next=${encodeURIComponent(pathname)}`);
   useWebSocket();
   useMobileRealtime();
+  usePreventZoom(); // BUG-028: iOS Safari 핀치 확대 차단 — 모바일 셸 안에서만 적용
 
   const { fetchPending } = useApprovalStore();
   const { fetchNotifications } = useNotificationStore();

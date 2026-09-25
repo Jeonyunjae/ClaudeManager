@@ -183,7 +183,7 @@ export default function SetupPage() {
                   padding: '12px 14px 12px 42px',
                   border: '1.5px solid var(--border-light)',
                   borderRadius: 12,
-                  fontSize: 14,
+                  fontSize: 16, // BUG-028: iOS 자동 확대 방지(16px 미만이면 포커스 시 확대)
                   fontFamily: 'inherit',
                   outline: 'none',
                   background: 'var(--bg-surface)',
@@ -245,7 +245,7 @@ export default function SetupPage() {
                   padding: '12px 14px 12px 42px',
                   border: `1.5px solid ${confirmPassword && passwordMatch ? '#34D399' : 'var(--border-light)'}`,
                   borderRadius: 12,
-                  fontSize: 14,
+                  fontSize: 16, // BUG-028: iOS 자동 확대 방지(16px 미만이면 포커스 시 확대)
                   fontFamily: 'inherit',
                   outline: 'none',
                   background: 'var(--bg-surface)',

@@ -17,9 +17,13 @@ export const metadata: Metadata = {
 };
 
 // iOS Safe Area(`viewport-fit=cover`) + 테마색 — SCR-M01~M04 safe-area 대응 (DES-006 §공통)
+// maximumScale/userScalable: 핀치 확대 차단 (BUG-028). iOS Safari가 user-scalable=no를
+// 무시하는 경우가 있어, 모바일 셸(`/m` layout)에서 gesturestart 등을 preventDefault로 보강한다.
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: 'cover',
   themeColor: '#6366f1',
 };

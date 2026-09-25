@@ -210,7 +210,7 @@ function LoginPageInner() {
                   padding: '12px 42px 12px 42px',
                   border: `1.5px solid ${error ? 'var(--status-error)' : isFocused ? '#7C5CFC' : 'var(--border-light)'}`,
                   borderRadius: 12,
-                  fontSize: 14,
+                  fontSize: 16, // BUG-028: iOS 자동 확대 방지(16px 미만이면 포커스 시 확대)
                   fontFamily: 'inherit',
                   outline: 'none',
                   transition: 'all 0.15s',

@@ -19,6 +19,14 @@
     margin: 0;
     padding: 0;
   }
+
+  /* 더블탭 확대 차단 (BUG-028) — manipulation은 더블탭 확대만 없애고 핀치는 막지 않는다
+     (핀치는 viewport userScalable=false + usePreventZoom에서 처리). */
+  html {
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
 }
 
 body {

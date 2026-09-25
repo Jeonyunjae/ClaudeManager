@@ -22,7 +22,8 @@ export function MessageComposer({ sending, onSend }: MessageComposerProps) {
 
   function autoResize(el: HTMLTextAreaElement): void {
     el.style.height = 'auto';
-    const lineHeight = 20; // px, text-sm 기준
+    // px, text-base(16px/1.5) 기준 — BUG-028: iOS 자동 확대 방지를 위해 text-sm(14px)에서 올림
+    const lineHeight = 24;
     const maxHeight = lineHeight * MAX_ROWS;
     el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
   }
@@ -83,7 +84,7 @@ export function MessageComposer({ sending, onSend }: MessageComposerProps) {
         onKeyDown={handleKeyDown}
         placeholder="메시지 입력…"
         aria-label="메시지 입력"
-        className="flex-1 resize-none rounded-[var(--radius-lg)] border border-[var(--primary-100)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-300)]"
+        className="flex-1 resize-none rounded-[var(--radius-lg)] border border-[var(--primary-100)] px-3 py-2 text-base text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-300)]"
       />
       <button
         type="button"

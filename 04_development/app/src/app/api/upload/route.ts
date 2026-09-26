@@ -4,8 +4,8 @@ import { logError } from '@/lib/error-logger';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { UPLOAD_DIR } from '@/lib/uploads';
 
-const UPLOAD_DIR = path.join(process.cwd(), 'data', 'uploads');
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_EXTENSIONS = [
   '.txt', '.md', '.csv', '.json', '.xml', '.yaml', '.yml',

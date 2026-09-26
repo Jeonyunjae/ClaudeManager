@@ -6,12 +6,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGetPaginated = vi.fn();
 const mockPost = vi.fn();
+const mockUpload = vi.fn();
+const mockPrepareImage = vi.fn();
 
 vi.mock('@/lib/api', () => ({
   default: {
     getPaginated: mockGetPaginated,
     post: mockPost,
+    upload: mockUpload,
   },
+}));
+
+vi.mock('@/lib/image-prepare', () => ({
+  prepareImage: mockPrepareImage,
 }));
 
 describe('mobileChatStore', () => {
@@ -19,6 +26,8 @@ describe('mobileChatStore', () => {
     vi.resetModules();
     mockGetPaginated.mockReset();
     mockPost.mockReset();
+    mockUpload.mockReset();
+    mockPrepareImage.mockReset();
   });
 
   it('load 성공 시 messages·hasMore를 채운다', async () => {
@@ -155,6 +164,89 @@ describe('mobileChatStore', () => {
     const s = useMobileChatStore.getState().getAgentState('a1');
     expect(s.messages[0].failed).toBe(false);
     expect(s.sending).toBe(false);
+  });
+
+  describe('사진 첨부 (FEAT-001)', () => {
+    const photo = { filename: 'IMG_0001.jpg', path: '/app/data/uploads/u1.jpg', type: 'image/jpeg' };
+
+    it('send: 첨부를 채팅 API에 함께 보내고, 버블에는 서버와 같은 📎 표시를 붙인다', async () => {
+      mockPost.mockResolvedValue({ data: {} });
+      const { useMobileChatStore } = await import('@/stores/mobileChatStore');
+
+      const ok = await useMobileChatStore.getState().send('a1', ' 이거 봐줘 ', [photo]);
+
+      expect(ok).toBe(true);
+      expect(mockPost).toHaveBeenCalledWith('/api/agents/a1/chat', { content: '이거 봐줘', attachments: [photo] });
+      expect(useMobileChatStore.getState().getAgentState('a1').messages[0].content).toBe('이거 봐줘\n\n📎 IMG_0001.jpg');
+    });
+
+    it('send: 글 없이 사진만 보내면 기본 문장으로 보낸다', async () => {
+      mockPost.mockResolvedValue({ data: {} });
+      const { useMobileChatStore } = await import('@/stores/mobileChatStore');
+      const { ATTACHMENT_ONLY_PROMPT } = await import('@/lib/constants');
+
+      const ok = await useMobileChatStore.getState().send('a1', '', [photo]);
+
+      expect(ok).toBe(true);
+      expect(mockPost).toHaveBeenCalledWith('/api/agents/a1/chat', { content: ATTACHMENT_ONLY_PROMPT, attachments: [photo] });
+    });
+
+    it('send: 첨부가 없으면 기존과 같은 본문 { content }만 보낸다', async () => {
+      mockPost.mockResolvedValue({ data: {} });
+      const { useMobileChatStore } = await import('@/stores/mobileChatStore');
+      await useMobileChatStore.getState().send('a1', '안녕');
+      expect(mockPost).toHaveBeenCalledWith('/api/agents/a1/chat', { content: '안녕' });
+    });
+
+    it('resend: 실패한 사진 메시지를 다시 보내면 원래 글과 첨부로 재전송한다', async () => {
+      mockPost.mockRejectedValueOnce(new Error('500'));
+      const { useMobileChatStore } = await import('@/stores/mobileChatStore');
+      await useMobileChatStore.getState().send('a1', '봐줘', [photo]);
+      const failedId = useMobileChatStore.getState().getAgentState('a1').messages[0].id;
+
+      mockPost.mockResolvedValueOnce({ data: {} });
+      await useMobileChatStore.getState().resend('a1', failedId);
+
+      expect(mockPost).toHaveBeenLastCalledWith('/api/agents/a1/chat', { content: '봐줘', attachments: [photo] });
+    });
+
+    it('WS chat:message(서버 표시문)가 오면 사진 낙관적 버블을 실 id로 맞바꾼다', async () => {
+      mockPost.mockResolvedValue({ data: {} });
+      const { useMobileChatStore } = await import('@/stores/mobileChatStore');
+      await useMobileChatStore.getState().send('a1', '봐줘', [photo]);
+
+      useMobileChatStore.getState().applyMessage({
+        id: 'real-1', sender: 'user', content: '봐줘\n\n📎 IMG_0001.jpg', messageType: 'text', agentId: 'a1', createdAt: '2026-09-26T00:00:00.000Z',
+      });
+
+      const msgs = useMobileChatStore.getState().getAgentState('a1').messages;
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].id).toBe('real-1');
+    });
+
+    it('uploadImage: 줄인 사진을 FormData로 올리고 채팅용 첨부 정보를 돌려준다', async () => {
+      const original = new File(['big'], 'IMG_0001.HEIC', { type: 'image/heic' });
+      const prepared = new File(['small'], 'IMG_0001.jpg', { type: 'image/jpeg' });
+      mockPrepareImage.mockResolvedValue(prepared);
+      mockUpload.mockResolvedValue({ data: { id: 'u1', ...photo, size: 5, ext: '.jpg', storedName: 'u1.jpg' } });
+      const { useMobileChatStore } = await import('@/stores/mobileChatStore');
+
+      const result = await useMobileChatStore.getState().uploadImage(original);
+
+      expect(mockPrepareImage).toHaveBeenCalledWith(original);
+      const [path, form] = mockUpload.mock.calls[0];
+      expect(path).toBe('/api/upload');
+      expect((form as FormData).get('file')).toBeInstanceOf(File);
+      expect(((form as FormData).get('file') as File).name).toBe('IMG_0001.jpg');
+      expect(result).toEqual(photo);
+    });
+
+    it('uploadImage: 업로드가 실패하면 예외를 그대로 던진다 (입력창이 실패 표시)', async () => {
+      mockPrepareImage.mockImplementation(async (f: File) => f);
+      mockUpload.mockRejectedValue(new Error('File exceeds 10MB limit.'));
+      const { useMobileChatStore } = await import('@/stores/mobileChatStore');
+      await expect(useMobileChatStore.getState().uploadImage(new File(['x'], 'a.jpg'))).rejects.toThrow('10MB');
+    });
   });
 
   describe('apply* (WS 반영 순수 로직)', () => {

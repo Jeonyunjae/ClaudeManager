@@ -86,9 +86,9 @@ class ApiClient {
     body?: unknown,
     skipAuth = false
   ): Promise<T> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
+    // FormData(파일 업로드)는 브라우저가 boundary를 붙인 Content-Type을 직접 정한다
+    const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
+    const headers: Record<string, string> = isForm ? {} : { 'Content-Type': 'application/json' };
 
     const token = this.getToken();
     if (token && !skipAuth) {
@@ -98,7 +98,7 @@ class ApiClient {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: isForm ? (body as FormData) : body ? JSON.stringify(body) : undefined,
     });
 
     const json = await response.json();
@@ -130,6 +130,11 @@ class ApiClient {
 
   async post<T>(path: string, body?: unknown, skipAuth = false): Promise<ApiResponse<T>> {
     return this.request<ApiResponse<T>>('POST', path, body, skipAuth);
+  }
+
+  /** multipart 업로드 — 인증 헤더·401 처리는 다른 요청과 같은 경로를 쓴다 */
+  async upload<T>(path: string, form: FormData): Promise<ApiResponse<T>> {
+    return this.request<ApiResponse<T>>('POST', path, form);
   }
 
   async put<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {

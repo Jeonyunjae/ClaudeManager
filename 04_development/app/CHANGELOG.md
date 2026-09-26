@@ -6,6 +6,8 @@
 ## [Unreleased] - 모바일 웹 Phase 1 (`feat/mobile-web`)
 
 ### Added
+- 모바일 대화 입력창 사진 첨부: 사진 보관함·카메라 선택, 미리보기·빼기, 업로드 전 긴 변 2048px JPEG 변환(HEIC 포함), 최대 4장, 글 없이 사진만 보내기, 실패 시 사진까지 복원 (FEAT-001, D-21)
+- `apiClient.upload(path, formData)` — 인증 헤더·401 처리를 공유하는 multipart 업로드 (FEAT-001)
 - 폭 판정 기반 모바일 자동 전환 + 데스크톱 보기 수동 전환·복귀 (FR-001, FR-002, UIR-001)
 - 로그인 성공 시 `next` 파라미터(같은 출처 상대 경로만)로 원래 화면 복귀 — Open Redirect 방지
 - `/m` 공통 셸: 인증 가드, WS 연결, 진입 시 inbox·notifications·tree 조회 (공통 EVT-SH-3)
@@ -22,6 +24,9 @@
 - WS `connection:open` 재연결 전이 감지 + 화면별 재조회(목록: inbox·tree / 대화: conversations 1페이지), 앱이 백그라운드에서 돌아올 때(`visibilitychange`) 연결 상태 확인 후 재연결 시도 (FR-005, DES-006 EVT-SH-1·EVT-SH-2)
 - `apiClient.del(path, body?)` — DELETE 요청에 JSON 바디를 실어 보낼 수 있도록 확장 (기존 바디 없는 호출부와 호환) (DF-012)
 - `CHANGELOG.md` 신설 (Keep a Changelog 형식)
+
+### Security
+- 채팅 API 첨부 경로를 업로드 폴더(`data/uploads`) 바로 아래 파일로 제한 — 클라이언트가 보낸 경로로 서버 임의 파일(`.env.local` 등)을 읽어 에이전트에게 넘길 수 있던 문제 차단 (FEAT-001)
 
 ### Changed
 - `mobileChatStore.send`가 `Promise<boolean>`을 반환하도록 확장해, 전송 실패 시 호출부가 후속 처리(입력 복원)를 판단할 수 있게 함

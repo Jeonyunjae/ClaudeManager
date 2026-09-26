@@ -2,6 +2,8 @@
 
 import { create } from 'zustand';
 import apiClient from '@/lib/api';
+import { prepareImage } from '@/lib/image-prepare';
+import { ATTACHMENT_ONLY_PROMPT } from '@/lib/constants';
 
 /** DES-002 §GET /api/agents/{id}/conversations 응답 항목 */
 export type ConversationMessage = {
@@ -16,7 +18,17 @@ export type ConversationMessage = {
   };
   /** 전송 실패 표시 (클라이언트 전용, DES-007 §4 Failed) */
   failed?: boolean;
+  /** 다시 보내기용 원래 요청 (클라이언트 전용 — content에는 📎 표시가 붙어 있다) */
+  outgoing?: { content: string; attachments: ChatAttachment[] };
 };
+
+/** `/api/upload` 응답 중 채팅 API에 넘기는 부분 (FEAT-001) */
+export type ChatAttachment = { filename: string; path: string; type: string };
+
+/** 서버가 저장·방송하는 사용자 메시지 표시문과 같은 형식 — 낙관적 버블을 실 메시지와 맞추는 데 쓴다 */
+export function attachmentDisplayContent(content: string, attachments: ChatAttachment[]): string {
+  return attachments.length > 0 ? `${content}\n\n📎 ${attachments.map((a) => a.filename).join(', ')}` : content;
+}
 
 export type StreamingState = {
   responseMsgId: string;
@@ -58,6 +70,11 @@ export function emptyAgentChatState(): AgentChatState {
   };
 }
 
+/** 채팅 API 요청 본문 — 첨부가 없으면 기존과 같은 `{ content }`만 보낸다 */
+function chatBody(outgoing: { content: string; attachments: ChatAttachment[] }) {
+  return outgoing.attachments.length > 0 ? outgoing : { content: outgoing.content };
+}
+
 function getOrInit(byAgent: Record<string, AgentChatState>, agentId: string): AgentChatState {
   return byAgent[agentId] ?? emptyAgentChatState();
 }
@@ -75,7 +92,9 @@ type MobileChatState = {
   load: (agentId: string) => Promise<void>;
   loadMore: (agentId: string) => Promise<void>;
   /** 성공 시 true, 실패 시 false — DF-009: 호출부(MessageComposer)가 실패 시 입력 내용을 복원한다 */
-  send: (agentId: string, content: string) => Promise<boolean>;
+  send: (agentId: string, content: string, attachments?: ChatAttachment[]) => Promise<boolean>;
+  /** 사진 1장을 줄여서 `/api/upload`에 올린다. 실패하면 throw (FEAT-001) */
+  uploadImage: (file: File) => Promise<ChatAttachment>;
   resend: (agentId: string, messageId: string) => Promise<void>;
 
   // WS 핸들러가 호출하는 순수 반영 함수들 (테스트 용이)
@@ -169,16 +188,18 @@ export const useMobileChatStore = create<MobileChatState>((set, get) => ({
   },
 
   // EVT-M02-2: 전송 — 낙관적 버블 추가, 실패 시 버블에 실패 표시(다시 보내기 가능) + 입력 내용 복원(DF-009)
-  send: async (agentId, content) => {
-    const trimmed = content.trim();
+  send: async (agentId, content, attachments = []) => {
+    const trimmed = content.trim() || (attachments.length > 0 ? ATTACHMENT_ONLY_PROMPT : '');
     if (!trimmed) return false;
+    const outgoing = { content: trimmed, attachments };
 
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const optimistic: ConversationMessage = {
       id: tempId,
       timestamp: new Date().toISOString(),
-      content: trimmed,
+      content: attachmentDisplayContent(trimmed, attachments),
       type: 'instruction',
+      outgoing,
     };
 
     set((state) => {
@@ -192,7 +213,7 @@ export const useMobileChatStore = create<MobileChatState>((set, get) => ({
     });
 
     try {
-      await apiClient.post<ChatSendResponse>(`/api/agents/${agentId}/chat`, { content: trimmed });
+      await apiClient.post<ChatSendResponse>(`/api/agents/${agentId}/chat`, chatBody(outgoing));
       set((state) => ({
         byAgent: { ...state.byAgent, [agentId]: { ...getOrInit(state.byAgent, agentId), sending: false } },
       }));
@@ -213,6 +234,14 @@ export const useMobileChatStore = create<MobileChatState>((set, get) => ({
       });
       return false;
     }
+  },
+
+  uploadImage: async (file) => {
+    const prepared = await prepareImage(file);
+    const form = new FormData();
+    form.append('file', prepared);
+    const res = await apiClient.upload<ChatAttachment & { id: string }>('/api/upload', form);
+    return { filename: res.data.filename, path: res.data.path, type: res.data.type };
   },
 
   // EVT-M02-3: [다시 보내기] — 같은 버블로 재전송한다
@@ -236,7 +265,10 @@ export const useMobileChatStore = create<MobileChatState>((set, get) => ({
     });
 
     try {
-      await apiClient.post<ChatSendResponse>(`/api/agents/${agentId}/chat`, { content: target.content });
+      await apiClient.post<ChatSendResponse>(
+        `/api/agents/${agentId}/chat`,
+        chatBody(target.outgoing ?? { content: target.content, attachments: [] })
+      );
       set((state) => ({
         byAgent: { ...state.byAgent, [agentId]: { ...getOrInit(state.byAgent, agentId), sending: false } },
       }));

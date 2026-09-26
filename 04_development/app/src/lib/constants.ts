@@ -20,6 +20,11 @@ export const WS_RECONNECT_MAX_MS = 30000;
 export const DEFAULT_PAGE_SIZE = 20;
 export const CHAT_PAGE_SIZE = 50;
 
+// Chat attachments — 대화 1건에 붙일 수 있는 첨부 수 (서버 검증·모바일 입력창 공용)
+export const MAX_CHAT_ATTACHMENTS = 4;
+// 첨부만 보내고 글을 쓰지 않았을 때 대신 보내는 문장 (데스크톱 팝업과 같은 값)
+export const ATTACHMENT_ONLY_PROMPT = '첨부 파일을 분석해주세요.';
+
 // Retry
 export const DEFAULT_RETRY_COUNT = 3;
 export const DEFAULT_RETRY_INTERVAL_BASE = 10; // seconds

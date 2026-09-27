@@ -50,7 +50,7 @@ export default function MobileLayout({
   const showBottomNav = !isConversationScreen(pathname);
 
   return (
-    <div className="flex flex-col" style={{ height: '100dvh' }}>
+    <div data-mobile-shell className="flex flex-col bg-[var(--bg-base)]" style={{ height: '100dvh' }}>
       <main className={`flex-1 flex flex-col overflow-hidden ${showBottomNav ? 'pb-16' : ''}`}>
         {children}
       </main>

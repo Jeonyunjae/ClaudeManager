@@ -39,6 +39,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* BUG-029: iPhone Safari에서 100dvh 셸이 하단 툴바 위에서 끝나 그 아래로 body(회색)가 비친다 —
+   입력창·하단 탭과 같은 흰색으로 채워 하단 막대가 떨어져 보이지 않게 한다. 셸 안쪽은 셸이 회색을 칠한다.
+   위 body 규칙이 레이어 밖이라 이 규칙도 레이어 밖에 둔다. */
+html:has(body [data-mobile-shell]),
+body:has([data-mobile-shell]) {
+  background: var(--bg-surface);
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

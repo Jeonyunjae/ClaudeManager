@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { wsBroadcast, requestCliExecution } from '@/lib/ws-bridge';
 import { loadMainSkill } from '@/lib/skill-loader';
 import fs from 'fs';
+import { validateChatAttachments } from '@/lib/uploads';
 
 export async function POST(
   request: NextRequest,
@@ -22,14 +23,20 @@ export async function POST(
 
   const { id: agentId } = await params;
   const body = await request.json();
-  const { content, attachments } = body as {
-    content: string;
-    attachments?: { filename: string; path: string; type: string }[];
-  };
+  const { content } = body as { content: string };
 
   if (!content?.trim()) {
     return NextResponse.json(
       { error: { code: 'VALIDATION_ERROR', message: 'Content is required' } },
+      { status: 400 }
+    );
+  }
+
+  // 첨부 경로는 업로드 폴더 안의 파일만 받는다 — 서버 임의 파일 읽기 방지 (FEAT-001)
+  const attachments = validateChatAttachments(body.attachments);
+  if (attachments === null) {
+    return NextResponse.json(
+      { error: { code: 'VALIDATION_ERROR', message: 'Invalid attachments' } },
       { status: 400 }
     );
   }
@@ -44,9 +51,9 @@ export async function POST(
 
   // Build prompt with attachments
   let cliPrompt = content.trim();
-  const attachmentNames = (attachments || []).map(a => a.filename);
+  const attachmentNames = attachments.map(a => a.filename);
 
-  if (attachments && attachments.length > 0) {
+  if (attachments.length > 0) {
     const fileDescriptions = attachments.map(a => {
       const isImage = a.type.startsWith('image/');
       if (isImage) {

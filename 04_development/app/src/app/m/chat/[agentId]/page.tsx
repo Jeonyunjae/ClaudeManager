@@ -19,7 +19,7 @@ export default function MobileConversationPage() {
 
   const { initialized, isLoading: treeLoading, getAgent, fetchTree } = useAgentStore();
   const { fetchInbox } = useInboxStore();
-  const { load, loadMore, send, resend, getAgentState } = useMobileChatStore();
+  const { load, loadMore, send, resend, uploadImage, getAgentState } = useMobileChatStore();
 
   // EVT-SH-2: 재연결 성공 시 대화 화면은 conversations 1페이지를 재조회해 누락분을 채운다 (DES-007 §4).
   const connected = useWsConnectionStatus(
@@ -111,7 +111,11 @@ export default function MobileConversationPage() {
         onResend={(messageId) => resend(agentId, messageId)}
       />
 
-      <MessageComposer sending={chatState.sending} onSend={(content) => send(agentId, content)} />
+      <MessageComposer
+        sending={chatState.sending}
+        onSend={(content, attachments) => send(agentId, content, attachments)}
+        onUpload={uploadImage}
+      />
     </div>
   );
 }

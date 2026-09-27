@@ -21,6 +21,30 @@ type ConversationViewProps = {
   onResend: (messageId: string) => void;
 };
 
+/**
+ * 에이전트 응답 본문 (BUG-030). 데스크톱과 같은 `.chat-markdown` 스타일을 쓴다 —
+ * 코드 블록은 말풍선 안에서 가로 스크롤, 표는 스크롤 상자로 감싸 말풍선 밖으로 넘치지 않게 한다.
+ */
+function MarkdownBody({ content, children }: { content: string; children?: React.ReactNode }) {
+  return (
+    <div className="chat-markdown min-w-0 text-sm text-[var(--text-primary)] [overflow-wrap:anywhere]">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          table: ({ node: _node, ...props }) => (
+            <div className="overflow-x-auto">
+              <table {...props} />
+            </div>
+          ),
+        }}
+      >
+        {content || ' '}
+      </ReactMarkdown>
+      {children}
+    </div>
+  );
+}
+
 function MessageTime({ iso }: { iso: string }) {
   const hhmm = (() => {
     const d = new Date(iso);
@@ -128,7 +152,7 @@ export function ConversationView({
         const isInstruction = m.type === 'instruction';
         return (
           <div key={m.id} className={`flex mb-3 ${isInstruction ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] ${isInstruction ? 'text-right' : ''}`}>
+            <div className={`max-w-[80%] min-w-0 ${isInstruction ? 'text-right' : ''}`}>
               <div
                 className={
                   isInstruction
@@ -137,11 +161,9 @@ export function ConversationView({
                 }
               >
                 {isInstruction ? (
-                  <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                  <p className="text-sm whitespace-pre-wrap [overflow-wrap:anywhere]">{m.content}</p>
                 ) : (
-                  <div className="text-sm prose prose-sm max-w-none text-[var(--text-primary)]">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content || ' '}</ReactMarkdown>
-                  </div>
+                  <MarkdownBody content={m.content} />
                 )}
                 {m.metadata?.tools && m.metadata.tools.length > 0 && (
                   <p className="text-[10px] mt-1 opacity-70">🔧 도구 {m.metadata.tools.length}회 사용</p>
@@ -171,11 +193,10 @@ export function ConversationView({
 
       {streaming && (
         <div className="flex justify-start mb-1">
-          <div className="max-w-[80%] bg-white border border-[var(--primary-50)] px-4 py-2.5 rounded-[var(--radius-2xl)] rounded-bl-[var(--radius-sm)] shadow-[var(--shadow-sm)]">
-            <div className="text-sm prose prose-sm max-w-none text-[var(--text-primary)]">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{streaming.content || ' '}</ReactMarkdown>
+          <div className="max-w-[80%] min-w-0 bg-white border border-[var(--primary-50)] px-4 py-2.5 rounded-[var(--radius-2xl)] rounded-bl-[var(--radius-sm)] shadow-[var(--shadow-sm)]">
+            <MarkdownBody content={streaming.content}>
               <span className="inline-block w-1.5 h-3.5 bg-[var(--primary-400)] align-middle ml-0.5 animate-pulse" />
-            </div>
+            </MarkdownBody>
           </div>
         </div>
       )}

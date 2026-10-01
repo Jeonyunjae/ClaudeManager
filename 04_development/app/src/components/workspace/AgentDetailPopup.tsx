@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Rnd } from 'react-rnd';
+import type { AgentConversation } from '@/types/agent';
 import { useAgentDetailStore } from '@/stores/agentDetailStore';
 import { useAgentStore } from '@/stores/agentStore';
 import { apiClient } from '@/lib/api';
@@ -507,6 +508,120 @@ function ToolTrace({ tools }: { tools: { name: string; target?: string }[] }) {
   );
 }
 
+/**
+ * 대화 1건 (BUG-032). 입력창 글자 하나마다 ChatTab 전체가 다시 그려지면서 모든 메시지의
+ * 마크다운을 다시 파싱해 입력이 느렸다 — 메시지를 memo 컴포넌트로 분리해 바뀐 메시지만 다시 그린다.
+ */
+const ConversationItem = React.memo(function ConversationItem({
+  c,
+  onCancelQueued,
+}: {
+  c: AgentConversation;
+  onCancelQueued: (messageId: string) => void;
+}) {
+  const isUser = c.fromAgent === 'user' || c.fromAgent === '나';
+  const isSystem = c.type === 'approval';
+
+  if (isSystem) {
+    return (
+      <div key={c.id} style={{ alignSelf: 'flex-start', maxWidth: '85%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ fontSize: '10px', fontWeight: 600, marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px', color: T.textSecondary }}>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: T.accentPurple, display: 'inline-block' }} />
+          {c.fromAgent}
+        </div>
+        <div style={{
+          padding: '10px 14px', fontSize: '12px', lineHeight: 1.6,
+          borderRadius: '14px', borderBottomLeftRadius: '4px',
+          background: '#F3F4F6', color: T.textPrimary,
+        }}>
+          {c.content}
+          {/* Approval card inline */}
+          <div style={{
+            background: '#FFFBEB', border: '1px solid #FDE68A',
+            borderRadius: '10px', padding: '12px', marginTop: '6px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+              <div style={{
+                width: '20px', height: '20px', borderRadius: '50%',
+                background: '#FDE68A', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#92400E" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+              </div>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#92400E' }}>승인 요청</span>
+            </div>
+            <div style={{ fontSize: '11px', color: '#78350F', marginBottom: '8px', lineHeight: 1.5 }}>{c.content}</div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '11px', fontWeight: 600, cursor: 'pointer', background: '#10B981', color: 'white' }}>승인</button>
+              <button style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '11px', fontWeight: 600, cursor: 'pointer', background: '#EF4444', color: 'white' }}>반려</button>
+              <button style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '11px', fontWeight: 600, cursor: 'pointer', background: '#F3F4F6', color: T.textPrimary }}>수정 지시</button>
+            </div>
+          </div>
+        </div>
+        <div style={{ fontSize: '9px', color: T.textTertiary, marginTop: '3px' }}>
+          {new Date(c.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      </div>
+    );
+  }
+
+  /*
+   * Wave AI 패널 구조를 따른다:
+   *   에이전트 답변 = 말풍선 없이 평문 (길고 마크다운·코드가 많아
+   *                   말풍선에 가두면 답답하다)
+   *   사용자 질문   = 오른쪽 정렬 말풍선
+   *   발신자 라벨   = 없음 (정렬과 배경으로 구분)
+   * 색은 Wave의 zinc 다크가 아니라 우리 토큰을 쓴다.
+   */
+  const meta = c.metadata as { tools?: { name: string; target?: string }[]; queued?: boolean; cancelled?: boolean } | undefined;
+  const tools = meta?.tools ?? [];
+
+  if (isUser) {
+    const queued = meta?.queued;
+    const cancelledMsg = meta?.cancelled;
+    return (
+      <div key={c.id} style={{ alignSelf: 'flex-end', maxWidth: 'calc(100% - 50px)', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+        <div style={{
+          padding: '8px 12px', fontSize: '12px', lineHeight: 1.6,
+          borderRadius: '10px', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          background: cancelledMsg ? 'transparent' : T.accentPurple,
+          color: cancelledMsg ? T.textTertiary : 'white',
+          border: cancelledMsg ? `1px dashed ${T.borderLight}` : 'none',
+          textDecoration: cancelledMsg ? 'line-through' : 'none',
+          opacity: queued ? 0.55 : 1,
+        }}>
+          {c.content}
+        </div>
+        <div style={{ fontSize: '9px', marginTop: '3px', color: T.textTertiary, display: 'flex', gap: 6, alignItems: 'center' }}>
+          {cancelledMsg && <span>취소됨</span>}
+          {queued && !cancelledMsg && (
+            <>
+              <span>대기 중</span>
+              <button
+                onClick={() => onCancelQueued(c.id)}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', color: T.textTertiary, fontSize: '11px', padding: 0 }}
+                title="대기 중인 질문 취소"
+              >✕</button>
+            </>
+          )}
+          {new Date(c.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div key={c.id} style={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column' }}>
+      {tools.length > 0 && <ToolTrace tools={tools} />}
+      <div className="chat-markdown" style={{ fontSize: '12px', lineHeight: 1.7, color: T.textPrimary, padding: '2px 2px 0' }}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{c.content}</ReactMarkdown>
+      </div>
+      <div style={{ fontSize: '9px', marginTop: '2px', color: T.textTertiary, padding: '0 2px' }}>
+        {new Date(c.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+      </div>
+    </div>
+  );
+});
+
 function ChatTab() {
   const { conversations, selectedAgent, sendMessage, cancelChat, isAgentSending, hasMoreConversations, isLoadingMore, loadMoreConversations } = useAgentDetailStore();
   const isSending = selectedAgent ? isAgentSending(selectedAgent.id) : false;
@@ -754,109 +869,9 @@ function ChatTab() {
             </div>
           </div>
         ) : (
-          conversations.map((c) => {
-            const isUser = c.fromAgent === 'user' || c.fromAgent === '나';
-            const isSystem = c.type === 'approval';
-
-            if (isSystem) {
-              return (
-                <div key={c.id} style={{ alignSelf: 'flex-start', maxWidth: '85%', display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 600, marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px', color: T.textSecondary }}>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: T.accentPurple, display: 'inline-block' }} />
-                    {c.fromAgent}
-                  </div>
-                  <div style={{
-                    padding: '10px 14px', fontSize: '12px', lineHeight: 1.6,
-                    borderRadius: '14px', borderBottomLeftRadius: '4px',
-                    background: '#F3F4F6', color: T.textPrimary,
-                  }}>
-                    {c.content}
-                    {/* Approval card inline */}
-                    <div style={{
-                      background: '#FFFBEB', border: '1px solid #FDE68A',
-                      borderRadius: '10px', padding: '12px', marginTop: '6px',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                        <div style={{
-                          width: '20px', height: '20px', borderRadius: '50%',
-                          background: '#FDE68A', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#92400E" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
-                        </div>
-                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#92400E' }}>승인 요청</span>
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#78350F', marginBottom: '8px', lineHeight: 1.5 }}>{c.content}</div>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '11px', fontWeight: 600, cursor: 'pointer', background: '#10B981', color: 'white' }}>승인</button>
-                        <button style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '11px', fontWeight: 600, cursor: 'pointer', background: '#EF4444', color: 'white' }}>반려</button>
-                        <button style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '11px', fontWeight: 600, cursor: 'pointer', background: '#F3F4F6', color: T.textPrimary }}>수정 지시</button>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '9px', color: T.textTertiary, marginTop: '3px' }}>
-                    {new Date(c.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
-              );
-            }
-
-            /*
-             * Wave AI 패널 구조를 따른다:
-             *   에이전트 답변 = 말풍선 없이 평문 (길고 마크다운·코드가 많아
-             *                   말풍선에 가두면 답답하다)
-             *   사용자 질문   = 오른쪽 정렬 말풍선
-             *   발신자 라벨   = 없음 (정렬과 배경으로 구분)
-             * 색은 Wave의 zinc 다크가 아니라 우리 토큰을 쓴다.
-             */
-            const meta = c.metadata as { tools?: { name: string; target?: string }[]; queued?: boolean; cancelled?: boolean } | undefined;
-            const tools = meta?.tools ?? [];
-
-            if (isUser) {
-              const queued = meta?.queued;
-              const cancelledMsg = meta?.cancelled;
-              return (
-                <div key={c.id} style={{ alignSelf: 'flex-end', maxWidth: 'calc(100% - 50px)', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                  <div style={{
-                    padding: '8px 12px', fontSize: '12px', lineHeight: 1.6,
-                    borderRadius: '10px', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                    background: cancelledMsg ? 'transparent' : T.accentPurple,
-                    color: cancelledMsg ? T.textTertiary : 'white',
-                    border: cancelledMsg ? `1px dashed ${T.borderLight}` : 'none',
-                    textDecoration: cancelledMsg ? 'line-through' : 'none',
-                    opacity: queued ? 0.55 : 1,
-                  }}>
-                    {c.content}
-                  </div>
-                  <div style={{ fontSize: '9px', marginTop: '3px', color: T.textTertiary, display: 'flex', gap: 6, alignItems: 'center' }}>
-                    {cancelledMsg && <span>취소됨</span>}
-                    {queued && !cancelledMsg && (
-                      <>
-                        <span>대기 중</span>
-                        <button
-                          onClick={() => cancelQueuedMessage(c.id)}
-                          style={{ border: 'none', background: 'none', cursor: 'pointer', color: T.textTertiary, fontSize: '11px', padding: 0 }}
-                          title="대기 중인 질문 취소"
-                        >✕</button>
-                      </>
-                    )}
-                    {new Date(c.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <div key={c.id} style={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column' }}>
-                {tools.length > 0 && <ToolTrace tools={tools} />}
-                <div className="chat-markdown" style={{ fontSize: '12px', lineHeight: 1.7, color: T.textPrimary, padding: '2px 2px 0' }}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{c.content}</ReactMarkdown>
-                </div>
-                <div style={{ fontSize: '9px', marginTop: '2px', color: T.textTertiary, padding: '0 2px' }}>
-                  {new Date(c.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                </div>
-              </div>
-            );
-          })
+          conversations.map((c) => (
+            <ConversationItem key={c.id} c={c} onCancelQueued={cancelQueuedMessage} />
+          ))
         )}
 
         {/* Typing indicator — 라벨·말풍선 없이 점만 (Wave 구조) */}

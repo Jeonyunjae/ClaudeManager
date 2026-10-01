@@ -530,21 +530,60 @@ function ChatTab() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef<number>(0);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [conversations.length]);
+  // BUG-031: 대화 탭을 열면 맨 아래로 간다.
+  // 예전에는 scrollIntoView(smooth)를 썼는데, 부드러운 스크롤이 맨 위(scrollTop<60)에서 시작하면서
+  // '이전 대화 더 불러오기'가 먼저 실행되어 위치가 중간에 고정되고, 그 뒤 마크다운·팝업 폭 애니메이션으로
+  // 내용 높이가 늘어나도 따라가지 않았다. 이제 "맨 아래에 붙어 있음" 상태를 두고, 붙어 있는 동안에는
+  // 내용 높이가 바뀔 때마다 맨 아래로 다시 맞춘다. 첫 위치를 잡기 전에는 더 불러오기를 하지 않는다.
+  const stickToBottomRef = useRef(true);
+  const initialPositionedRef = useRef(false);
 
-  // Scroll to bottom on tab mount
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
-    });
+  const scrollToBottom = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
   }, []);
+
+  // 새 메시지(마지막 메시지가 바뀜)가 오면 맨 아래로. 이전 대화를 앞에 붙일 때는 마지막이 그대로라 움직이지 않는다.
+  const lastConversationId = conversations.length > 0 ? conversations[conversations.length - 1].id : null;
+  useEffect(() => {
+    stickToBottomRef.current = true;
+    scrollToBottom();
+    if (lastConversationId) {
+      requestAnimationFrame(() => {
+        scrollToBottom();
+        initialPositionedRef.current = true;
+      });
+    }
+  }, [lastConversationId, scrollToBottom]);
+
+  // 내용·컨테이너 크기가 바뀌어도(마크다운 렌더, 이미지 로드, 팝업 폭 전환, 스트리밍) 맨 아래에 붙어 있으면 따라간다
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') return;
+    const follow = () => {
+      if (stickToBottomRef.current) scrollToBottom();
+    };
+    const resizeObserver = new ResizeObserver(follow);
+    const observeChildren = () => Array.from(container.children).forEach((child) => resizeObserver.observe(child));
+    resizeObserver.observe(container);
+    observeChildren();
+    const mutationObserver = new MutationObserver(() => {
+      observeChildren();
+      follow();
+    });
+    mutationObserver.observe(container, { childList: true, subtree: true, characterData: true });
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    };
+  }, [scrollToBottom]);
 
   // Scroll to top detection for loading more
   const handleScroll = useCallback(() => {
     const container = messagesContainerRef.current;
-    if (!container || !selectedAgent || isLoadingMore || !hasMoreConversations) return;
+    if (!container) return;
+    stickToBottomRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 40;
+    if (!initialPositionedRef.current || !selectedAgent || isLoadingMore || !hasMoreConversations) return;
     if (container.scrollTop < 60) {
       prevScrollHeightRef.current = container.scrollHeight;
       loadMoreConversations(selectedAgent.id).then(() => {

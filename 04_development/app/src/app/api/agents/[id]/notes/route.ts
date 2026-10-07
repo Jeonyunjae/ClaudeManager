@@ -5,6 +5,7 @@ import { agents } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import fs from 'fs';
 import path from 'path';
+import { resolveNotesRoot, HIDDEN_NOTE_DIRS } from '@/lib/notes-root';
 
 async function getAgent(agentId: string) {
   const [agent] = await db.select().from(agents).where(eq(agents.id, agentId)).limit(1);
@@ -44,9 +45,13 @@ export async function GET(
     );
   }
 
-  if (!agent.notesPath) {
-    return NextResponse.json({ data: { folders: [], files: [], current: '' } });
+  // FEAT-002: 노트 경로가 없으면 작업 폴더(Main은 전체 프로젝트 폴더)를 읽기 전용으로 보여 준다
+  const notesRoot = resolveNotesRoot(agent);
+  const root = { source: notesRoot.source, path: notesRoot.path, readOnly: notesRoot.readOnly };
+  if (!notesRoot.path) {
+    return NextResponse.json({ data: { folders: [], files: [], current: '', root } });
   }
+  const notesPath = notesRoot.path;
 
   const { searchParams } = new URL(request.url);
   const fileParam = searchParams.get('file');
@@ -60,7 +65,7 @@ export async function GET(
         { status: 400 }
       );
     }
-    const fullPath = path.join(agent.notesPath, normalized);
+    const fullPath = path.join(notesPath, normalized);
     if (!fs.existsSync(fullPath) || fs.statSync(fullPath).isDirectory()) {
       return NextResponse.json(
         { error: { code: 'NOT_FOUND', message: 'File not found' } },
@@ -85,11 +90,11 @@ export async function GET(
   }
 
   const targetDir = subpath
-    ? path.join(agent.notesPath, normalized)
-    : agent.notesPath;
+    ? path.join(notesPath, normalized)
+    : notesPath;
 
   if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) {
-    return NextResponse.json({ data: { folders: [], files: [], current: subpath } });
+    return NextResponse.json({ data: { folders: [], files: [], current: subpath, root } });
   }
 
   const entries = fs.readdirSync(targetDir, { withFileTypes: true });
@@ -97,7 +102,7 @@ export async function GET(
   const files: Array<{ name: string; path: string; updatedAt: string }> = [];
 
   for (const entry of entries) {
-    if (entry.name.startsWith('.')) continue;
+    if (entry.name.startsWith('.') || HIDDEN_NOTE_DIRS.has(entry.name)) continue;
     const relativePath = subpath ? `${subpath}/${entry.name}` : entry.name;
 
     if (entry.isDirectory()) {
@@ -111,7 +116,7 @@ export async function GET(
   folders.sort((a, b) => a.name.localeCompare(b.name));
   files.sort((a, b) => a.name.localeCompare(b.name));
 
-  return NextResponse.json({ data: { folders, files, current: subpath || '' } });
+  return NextResponse.json({ data: { folders, files, current: subpath || '', root } });
 }
 
 export async function POST(
@@ -124,6 +129,13 @@ export async function POST(
   const { id: agentId } = await params;
   const agent = await getAgent(agentId);
   if (!agent || !agent.notesPath) {
+    // 자동 연결 폴더(작업 폴더)는 에이전트 원본 문서라 쓰기·삭제를 막는다 (FEAT-002)
+    if (agent && resolveNotesRoot(agent).path) {
+      return NextResponse.json(
+        { error: { code: 'READ_ONLY', message: 'Project folder notes are read-only' } },
+        { status: 403 }
+      );
+    }
     return NextResponse.json(
       { error: { code: 'AGENT_NOT_FOUND', message: 'Agent or notes path not found' } },
       { status: 404 }
@@ -170,6 +182,13 @@ export async function DELETE(
   const { id: agentId } = await params;
   const agent = await getAgent(agentId);
   if (!agent || !agent.notesPath) {
+    // 자동 연결 폴더(작업 폴더)는 에이전트 원본 문서라 쓰기·삭제를 막는다 (FEAT-002)
+    if (agent && resolveNotesRoot(agent).path) {
+      return NextResponse.json(
+        { error: { code: 'READ_ONLY', message: 'Project folder notes are read-only' } },
+        { status: 403 }
+      );
+    }
     return NextResponse.json(
       { error: { code: 'AGENT_NOT_FOUND', message: 'Agent or notes path not found' } },
       { status: 404 }

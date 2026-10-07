@@ -44,10 +44,18 @@ export type NoteFileEntry = {
   updatedAt: string;
 };
 
+/** 노트 탭이 보여 주는 폴더 — 지정 경로 또는 자동 연결된 작업 폴더 (FEAT-002) */
+export type NoteRoot = {
+  source: 'custom' | 'project' | 'projects' | 'none';
+  path: string | null;
+  readOnly: boolean;
+};
+
 export type NoteBrowseResult = {
   folders: NoteFolder[];
   files: NoteFileEntry[];
   current: string;
+  root?: NoteRoot;
 };
 
 type AgentDetailState = {
@@ -59,6 +67,7 @@ type AgentDetailState = {
   isLoadingMore: boolean;
   notes: AgentNote[];
   noteFolders: NoteFolder[];
+  noteRoot: NoteRoot | null;
   noteCurrentPath: string;
   noteLoading: boolean;
   selectedNoteContent: AgentNote | null;
@@ -109,6 +118,7 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
   isLoadingMore: false,
   notes: [],
   noteFolders: [],
+  noteRoot: null,
   noteCurrentPath: '',
   noteLoading: false,
   selectedNoteContent: null,
@@ -176,6 +186,7 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
       hasMoreConversations: false,
       notes: [],
       noteFolders: [],
+      noteRoot: null,
       noteCurrentPath: '',
       selectedNoteContent: null,
       logs: [],
@@ -248,6 +259,7 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
         notes: res.data.files as unknown as AgentNote[],
         noteFolders: res.data.folders,
         noteCurrentPath: res.data.current,
+        ...(res.data.root ? { noteRoot: res.data.root } : {}),
         noteLoading: false,
       });
     } catch {

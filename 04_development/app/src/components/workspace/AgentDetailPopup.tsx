@@ -1305,7 +1305,7 @@ function TreeNode({ agentId, name, nodePath, depth }: { agentId: string; name: s
 }
 
 function NoteTab() {
-  const { notes, noteFolders, noteLoading, selectedNoteContent, noteContentLoading, selectedAgent, updateNotesPath, fetchNotes, fetchNoteContent } = useAgentDetailStore();
+  const { notes, noteFolders, noteRoot, noteLoading, selectedNoteContent, noteContentLoading, selectedAgent, updateNotesPath, fetchNotes, fetchNoteContent } = useAgentDetailStore();
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [pathSaving, setPathSaving] = useState(false);
 
@@ -1321,8 +1321,17 @@ function NoteTab() {
     } catch {} finally { setPathSaving(false); }
   };
 
-  // 경로 미설정 시 설정 화면
-  if (!notesPath) {
+  // FEAT-002: 노트 경로가 없어도 작업 폴더(Main은 전체 프로젝트 폴더)가 있으면 그 문서를 보여 준다
+  const autoRoot = !notesPath && noteRoot && (noteRoot.source === 'project' || noteRoot.source === 'projects');
+  const rootLabel = notesPath ? 'Files' : noteRoot?.source === 'projects' ? '전체 프로젝트 문서' : autoRoot ? '작업 폴더 문서' : 'Files';
+  const rootTitle = notesPath || noteRoot?.path || '';
+
+  if (!notesPath && !noteRoot && noteLoading) {
+    return <div style={{ padding: '40px', textAlign: 'center', fontSize: '12px', color: T.textTertiary }}>로딩 중...</div>;
+  }
+
+  // 경로 미설정이고 작업 폴더도 없을 때만 설정 화면
+  if (!notesPath && !autoRoot) {
     return (
       <>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '260px', gap: '16px', padding: '0 40px' }}>
@@ -1375,8 +1384,11 @@ function NoteTab() {
           padding: '10px 12px', borderBottom: `1px solid ${T.borderLight}`,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: T.textTertiary, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-            Files
+          <span
+            title={autoRoot ? `${rootTitle} (읽기 전용)` : rootTitle}
+            style={{ fontSize: '11px', fontWeight: 600, color: T.textTertiary, letterSpacing: '0.03em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
+            {rootLabel}
           </span>
           <button
             onClick={() => setShowFolderPicker(true)}
@@ -1385,7 +1397,7 @@ function NoteTab() {
               background: 'transparent', cursor: 'pointer', color: T.textTertiary,
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px',
             }}
-            title="경로 변경"
+            title={autoRoot ? '다른 노트 경로 지정' : '경로 변경'}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>

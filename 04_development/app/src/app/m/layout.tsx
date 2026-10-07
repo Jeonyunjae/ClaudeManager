@@ -12,9 +12,9 @@ import { useInboxStore } from '@/stores/inboxStore';
 import { useAgentStore } from '@/stores/agentStore';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 
-/** SCR-M02(대화)에서는 하단 탭을 숨긴다 — 입력 공간 확보 + 키보드와 겹침 방지 (DES-006) */
+/** SCR-M02(대화)·문서 화면(FEAT-003)에서는 하단 탭을 숨긴다 — 입력·읽기 공간 확보 + 키보드와 겹침 방지 (DES-006) */
 function isConversationScreen(pathname: string): boolean {
-  return /^\/m\/chat\/[^/]+$/.test(pathname);
+  return /^\/m\/chat\/[^/]+(\/docs)?$/.test(pathname);
 }
 
 /** 공통 MobileShell (`/m` layout) — DES-006 §공통. 100dvh + safe-area, 진입 시 인박스·트리 조회 + WS 연결 */

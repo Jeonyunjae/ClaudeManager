@@ -6,6 +6,8 @@
 ## [Unreleased] - 모바일 웹 Phase 1 (`feat/mobile-web`)
 
 ### Added
+- 모바일 문서 화면 `/m/chat/[agentId]/docs`: 대화 화면 오른쪽 위 [문서] 버튼 → 폴더·문서 목록, 경로 표시줄, 문서 보기(마크다운·표 가로 스크롤), 읽기 전용. 노트 탭과 같은 폴더를 본다 (FEAT-003, D-27)
+- 에이전트 팝업 노트 탭: 노트 경로를 지정하지 않으면 그 에이전트의 작업 폴더 문서를 자동으로 보여 줌(Main은 전체 프로젝트 폴더). 자동 연결 폴더는 읽기 전용(쓰기·삭제 API 403), `node_modules` 숨김. 지정한 노트 경로는 기존과 같이 우선 (FEAT-002, D-26)
 - 모바일 대화 입력창 사진 첨부: 사진 보관함·카메라 선택, 미리보기·빼기, 업로드 전 긴 변 2048px JPEG 변환(HEIC 포함), 최대 4장, 글 없이 사진만 보내기, 실패 시 사진까지 복원 (FEAT-001, D-21)
 - `apiClient.upload(path, formData)` — 인증 헤더·401 처리를 공유하는 multipart 업로드 (FEAT-001)
 - 폭 판정 기반 모바일 자동 전환 + 데스크톱 보기 수동 전환·복귀 (FR-001, FR-002, UIR-001)
@@ -29,6 +31,7 @@
 - 채팅 API 첨부 경로를 업로드 폴더(`data/uploads`) 바로 아래 파일로 제한 — 클라이언트가 보낸 경로로 서버 임의 파일(`.env.local` 등)을 읽어 에이전트에게 넘길 수 있던 문제 차단 (FEAT-001)
 
 ### Changed
+- 모바일 마크다운 본문을 `components/mobile/MarkdownBody`로 분리해 대화 말풍선·문서 화면이 함께 쓴다 (FEAT-003)
 - `mobileChatStore.send`가 `Promise<boolean>`을 반환하도록 확장해, 전송 실패 시 호출부가 후속 처리(입력 복원)를 판단할 수 있게 함
 - `usePushSubscription`의 구독 해제(`DELETE /api/notifications/subscribe`) 호출을 `fetch` 직접 호출에서 `apiClient.del(path, body)`로 되돌려, 다른 API 호출과 동일한 401 처리·인증 헤더 경로를 재사용 (DF-012)
 - 알림 생성 호출 5곳(에이전트 응답 완료·오류, 키 만료 등)을 `createNotification` 공통 경로로 통일

@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useLayoutEffect, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { MarkdownBody } from '@/components/mobile/MarkdownBody';
 import type { ConversationMessage, StreamingState } from '@/stores/mobileChatStore';
 
 type ConversationViewProps = {
@@ -20,30 +19,6 @@ type ConversationViewProps = {
   onRetry: () => void;
   onResend: (messageId: string) => void;
 };
-
-/**
- * 에이전트 응답 본문 (BUG-030). 데스크톱과 같은 `.chat-markdown` 스타일을 쓴다 —
- * 코드 블록은 말풍선 안에서 가로 스크롤, 표는 스크롤 상자로 감싸 말풍선 밖으로 넘치지 않게 한다.
- */
-function MarkdownBody({ content, children }: { content: string; children?: React.ReactNode }) {
-  return (
-    <div className="chat-markdown min-w-0 text-sm text-[var(--text-primary)] [overflow-wrap:anywhere]">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          table: ({ node: _node, ...props }) => (
-            <div className="overflow-x-auto">
-              <table {...props} />
-            </div>
-          ),
-        }}
-      >
-        {content || ' '}
-      </ReactMarkdown>
-      {children}
-    </div>
-  );
-}
 
 function MessageTime({ iso }: { iso: string }) {
   const hhmm = (() => {

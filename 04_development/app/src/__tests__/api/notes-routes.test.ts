@@ -34,8 +34,8 @@ afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 const auth = () => ({ Authorization: `Bearer ${generateToken(1)}` });
 const params = { params: Promise.resolve({ id: 'a1' }) };
-const req = (url: string, init?: RequestInit) =>
-  new NextRequest(`http://localhost/api/agents/a1/notes${url}`, { ...init, headers: { ...auth(), ...(init?.headers || {}) } });
+const req = (url: string, init?: { method?: string; body?: string }) =>
+  new NextRequest(`http://localhost/api/agents/a1/notes${url}`, { ...init, headers: auth() });
 
 beforeEach(() => {
   h.rows = [];

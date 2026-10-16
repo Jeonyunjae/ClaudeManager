@@ -75,6 +75,15 @@ describe('GET /api/agents/[id]/notes', () => {
   });
 });
 
+describe('GET ?resolve= (FEAT-004)', () => {
+  it('대화 속 참조를 작업 폴더 기준 경로로 찾는다', async () => {
+    h.rows = [{ id: 'a1', role: 'sub', notesPath: null, projectRoot: tmp }];
+    const { GET } = await import('@/app/api/agents/[id]/notes/route');
+    const body = await (await GET(req('?resolve=plan.md'), params)).json();
+    expect(body.data.matches).toEqual(['docs/plan.md']);
+  });
+});
+
 describe('작업 폴더는 읽기 전용', () => {
   it('POST(쓰기)는 403', async () => {
     h.rows = [{ id: 'a1', role: 'sub', notesPath: null, projectRoot: tmp }];

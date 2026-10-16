@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { docRefFromHref, isExternalHref, isWholeDocRef, remarkDocRefs } from '@/lib/doc-refs';
+import { joinDocPath, parentPath } from '@/lib/doc-path';
 import { Rnd } from 'react-rnd';
 import type { AgentConversation } from '@/types/agent';
 import { useAgentDetailStore } from '@/stores/agentDetailStore';
@@ -509,15 +511,49 @@ function ToolTrace({ tools }: { tools: { name: string; target?: string }[] }) {
 }
 
 /**
+ * 마크다운 링크 렌더러 (FEAT-004). 문서 참조(`#cmdoc=`·문서 상대 링크)는 노트 탭으로 열고,
+ * 웹 주소는 새 탭으로 연다 — 관리 화면을 떠나지 않게.
+ */
+function markdownLinkComponents(onOpenDocRef: (ref: string) => void) {
+  return {
+    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+      const ref = docRefFromHref(href) ?? (href && !isExternalHref(href) && isWholeDocRef(href) ? href : null);
+      if (ref) {
+        return (
+          <a
+            href={href}
+            onClick={(e) => {
+              e.preventDefault();
+              onOpenDocRef(ref);
+            }}
+            title="노트 탭에서 열기"
+            style={{ color: T.accentPurple, textDecoration: 'underline dotted', textUnderlineOffset: '2px', cursor: 'pointer' }}
+          >
+            {children}
+          </a>
+        );
+      }
+      return (
+        <a href={href} {...(isExternalHref(href) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+          {children}
+        </a>
+      );
+    },
+  };
+}
+
+/**
  * 대화 1건 (BUG-032). 입력창 글자 하나마다 ChatTab 전체가 다시 그려지면서 모든 메시지의
  * 마크다운을 다시 파싱해 입력이 느렸다 — 메시지를 memo 컴포넌트로 분리해 바뀐 메시지만 다시 그린다.
  */
 const ConversationItem = React.memo(function ConversationItem({
   c,
   onCancelQueued,
+  onOpenDocRef,
 }: {
   c: AgentConversation;
   onCancelQueued: (messageId: string) => void;
+  onOpenDocRef: (ref: string) => void;
 }) {
   const isUser = c.fromAgent === 'user' || c.fromAgent === '나';
   const isSystem = c.type === 'approval';
@@ -613,7 +649,9 @@ const ConversationItem = React.memo(function ConversationItem({
     <div key={c.id} style={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column' }}>
       {tools.length > 0 && <ToolTrace tools={tools} />}
       <div className="chat-markdown" style={{ fontSize: '12px', lineHeight: 1.7, color: T.textPrimary, padding: '2px 2px 0' }}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{c.content}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm, remarkDocRefs]} components={markdownLinkComponents(onOpenDocRef)}>
+          {c.content}
+        </ReactMarkdown>
       </div>
       <div style={{ fontSize: '9px', marginTop: '2px', color: T.textTertiary, padding: '0 2px' }}>
         {new Date(c.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
@@ -639,6 +677,17 @@ function ChatTab() {
       void cancelQueuedInStore(selectedAgent.id, messageId);
     },
     [selectedAgent, cancelQueuedInStore]
+  );
+
+  // FEAT-004: 답변 속 문서 참조 → 노트 탭에서 그 문서를 연다
+  const { setActiveTab, openNoteRef } = useAgentDetailStore();
+  const openDocRef = useCallback(
+    (ref: string) => {
+      if (!selectedAgent) return;
+      setActiveTab('note');
+      void openNoteRef(selectedAgent.id, ref);
+    },
+    [selectedAgent, setActiveTab, openNoteRef]
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -870,7 +919,7 @@ function ChatTab() {
           </div>
         ) : (
           conversations.map((c) => (
-            <ConversationItem key={c.id} c={c} onCancelQueued={cancelQueuedMessage} />
+            <ConversationItem key={c.id} c={c} onCancelQueued={cancelQueuedMessage} onOpenDocRef={openDocRef} />
           ))
         )}
 
@@ -1305,7 +1354,7 @@ function TreeNode({ agentId, name, nodePath, depth }: { agentId: string; name: s
 }
 
 function NoteTab() {
-  const { notes, noteFolders, noteRoot, noteLoading, selectedNoteContent, noteContentLoading, selectedAgent, updateNotesPath, fetchNotes, fetchNoteContent } = useAgentDetailStore();
+  const { notes, noteFolders, noteRoot, noteRefResult, noteLoading, selectedNoteContent, noteContentLoading, selectedAgent, updateNotesPath, fetchNotes, fetchNoteContent, openNoteRef } = useAgentDetailStore();
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [pathSaving, setPathSaving] = useState(false);
 
@@ -1446,6 +1495,28 @@ function NoteTab() {
 
       {/* Right content — note viewer */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+        {noteRefResult && (
+          <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '10px', background: '#F5F3FF', border: '1px solid #DDD6FE', fontSize: '12px', color: T.textPrimary }}>
+            {noteRefResult.matches.length === 0 ? (
+              <span><b>{noteRefResult.ref}</b> 문서를 찾지 못했습니다</span>
+            ) : (
+              <>
+                <div style={{ marginBottom: '6px' }}>
+                  <b>{noteRefResult.ref}</b> — 같은 이름의 문서가 {noteRefResult.matches.length}개 있습니다
+                </div>
+                {noteRefResult.matches.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => fetchNoteContent(agentId, m)}
+                    style={{ display: 'block', border: 'none', background: 'none', padding: '3px 0', cursor: 'pointer', color: T.accentPurple, fontSize: '12px', textAlign: 'left', fontFamily: 'inherit' }}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        )}
         {noteContentLoading ? (
           <div style={{ textAlign: 'center', padding: '60px', fontSize: '12px', color: T.textTertiary }}>로딩 중...</div>
         ) : selectedNoteContent ? (
@@ -1478,7 +1549,10 @@ function NoteTab() {
                 wordBreak: 'break-word',
               }}
             >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkDocRefs]}
+                components={markdownLinkComponents((r) => openNoteRef(agentId, joinDocPath(parentPath(selectedNoteContent.file), r)))}
+              >
                 {selectedNoteContent.content}
               </ReactMarkdown>
             </div>

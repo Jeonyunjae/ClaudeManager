@@ -68,6 +68,8 @@ type AgentDetailState = {
   notes: AgentNote[];
   noteFolders: NoteFolder[];
   noteRoot: NoteRoot | null;
+  /** FEAT-004: 대화 속 문서 참조를 눌렀을 때 찾은 결과 — 후보가 하나가 아니면 노트 탭이 안내·목록을 보여 준다 */
+  noteRefResult: { ref: string; matches: string[] } | null;
   noteCurrentPath: string;
   noteLoading: boolean;
   selectedNoteContent: AgentNote | null;
@@ -94,6 +96,7 @@ type AgentDetailState = {
   loadMoreConversations: (agentId: string) => Promise<void>;
   fetchNotes: (agentId: string, subpath?: string) => Promise<void>;
   fetchNoteContent: (agentId: string, filePath: string) => Promise<void>;
+  openNoteRef: (agentId: string, ref: string) => Promise<void>;
   fetchLogs: (agentId: string, search?: string) => Promise<void>;
   fetchCLILogs: (agentId: string) => Promise<void>;
   sendMessage: (agentId: string, content: string, attachments?: { filename: string; path: string; type: string }[]) => Promise<void>;
@@ -119,6 +122,7 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
   notes: [],
   noteFolders: [],
   noteRoot: null,
+  noteRefResult: null,
   noteCurrentPath: '',
   noteLoading: false,
   selectedNoteContent: null,
@@ -187,6 +191,7 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
       notes: [],
       noteFolders: [],
       noteRoot: null,
+      noteRefResult: null,
       noteCurrentPath: '',
       selectedNoteContent: null,
       logs: [],
@@ -267,8 +272,21 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
     }
   },
 
+  openNoteRef: async (agentId, ref) => {
+    set({ noteRefResult: null });
+    try {
+      const res = await apiClient.get<{ ref: string; matches: string[] }>(
+        `/api/agents/${agentId}/notes?resolve=${encodeURIComponent(ref)}`
+      );
+      const matches = res.data.matches;
+      set({ noteRefResult: matches.length === 1 ? null : { ref, matches } });
+      if (matches.length === 1) await get().fetchNoteContent(agentId, matches[0]);
+    } catch {
+      set({ noteRefResult: { ref, matches: [] } });
+    }
+  },
   fetchNoteContent: async (agentId, filePath) => {
-    set({ noteContentLoading: true });
+    set({ noteContentLoading: true, noteRefResult: null });
     try {
       const res = await apiClient.get<AgentNote>(`/api/agents/${agentId}/notes?file=${encodeURIComponent(filePath)}`);
       set({ selectedNoteContent: res.data, noteContentLoading: false });

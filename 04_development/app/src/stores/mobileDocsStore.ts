@@ -18,12 +18,16 @@ type MobileDocsState = {
   error: string | null;
   loadFolder: (agentId: string, path: string) => Promise<void>;
   loadFile: (agentId: string, file: string) => Promise<void>;
+  /** FEAT-004: 대화 속 문서 참조 → 후보 경로 */
+  resolved: { agentId: string; ref: string; matches: string[] } | null;
+  resolveRef: (agentId: string, ref: string) => Promise<void>;
 };
 
 /** 모바일 문서 화면 (FEAT-003) — 노트 API를 읽기만 한다 */
 export const useMobileDocsStore = create<MobileDocsState>((set) => ({
   listing: null,
   doc: null,
+  resolved: null,
   loading: false,
   error: null,
 
@@ -45,6 +49,18 @@ export const useMobileDocsStore = create<MobileDocsState>((set) => ({
       set({ doc: { ...res.data, agentId }, loading: false });
     } catch {
       set({ loading: false, error: '문서를 열지 못했습니다' });
+    }
+  },
+
+  resolveRef: async (agentId, ref) => {
+    set({ loading: true, error: null, resolved: null });
+    try {
+      const res = await apiClient.get<{ ref: string; matches: string[] }>(
+        `/api/agents/${agentId}/notes?resolve=${encodeURIComponent(ref)}`
+      );
+      set({ resolved: { agentId, ref, matches: res.data.matches }, loading: false });
+    } catch {
+      set({ loading: false, error: '문서를 찾지 못했습니다' });
     }
   },
 }));

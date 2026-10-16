@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import fs from 'fs';
 import path from 'path';
 import { resolveNotesRoot, HIDDEN_NOTE_DIRS } from '@/lib/notes-root';
+import { resolveDocRef } from '@/lib/notes-resolve';
 
 async function getAgent(agentId: string) {
   const [agent] = await db.select().from(agents).where(eq(agents.id, agentId)).limit(1);
@@ -55,6 +56,12 @@ export async function GET(
 
   const { searchParams } = new URL(request.url);
   const fileParam = searchParams.get('file');
+
+  // FEAT-004: 대화 속 문서 참조 → 루트 기준 상대 경로 후보 (?resolve=docs/a.md)
+  const refParam = searchParams.get('resolve');
+  if (refParam) {
+    return NextResponse.json({ data: { ref: refParam, matches: resolveDocRef(notesPath, refParam), root } });
+  }
 
   // Single file content
   if (fileParam) {

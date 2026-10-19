@@ -123,6 +123,7 @@ export default function MobileConversationPage() {
         onLoadMore={() => loadMore(agentId)}
         onRetry={() => load(agentId)}
         onResend={(messageId) => resend(agentId, messageId)}
+        docHref={(ref) => `/m/chat/${agentId}/docs?ref=${encodeURIComponent(ref)}`}
       />
 
       <MessageComposer

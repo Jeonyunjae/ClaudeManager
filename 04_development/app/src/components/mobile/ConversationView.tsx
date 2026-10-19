@@ -18,6 +18,8 @@ type ConversationViewProps = {
   onLoadMore: () => void;
   onRetry: () => void;
   onResend: (messageId: string) => void;
+  /** FEAT-004: 답변 속 문서 경로를 누르면 갈 주소 */
+  docHref?: (ref: string) => string;
 };
 
 function MessageTime({ iso }: { iso: string }) {
@@ -43,6 +45,7 @@ export function ConversationView({
   onLoadMore,
   onRetry,
   onResend,
+  docHref,
 }: ConversationViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef<number | null>(null);
@@ -138,7 +141,7 @@ export function ConversationView({
                 {isInstruction ? (
                   <p className="text-sm whitespace-pre-wrap [overflow-wrap:anywhere]">{m.content}</p>
                 ) : (
-                  <MarkdownBody content={m.content} />
+                  <MarkdownBody content={m.content} docHref={docHref} />
                 )}
                 {m.metadata?.tools && m.metadata.tools.length > 0 && (
                   <p className="text-[10px] mt-1 opacity-70">🔧 도구 {m.metadata.tools.length}회 사용</p>
@@ -169,7 +172,7 @@ export function ConversationView({
       {streaming && (
         <div className="flex justify-start mb-1">
           <div className="max-w-[80%] min-w-0 bg-white border border-[var(--primary-50)] px-4 py-2.5 rounded-[var(--radius-2xl)] rounded-bl-[var(--radius-sm)] shadow-[var(--shadow-sm)]">
-            <MarkdownBody content={streaming.content}>
+            <MarkdownBody content={streaming.content} docHref={docHref}>
               <span className="inline-block w-1.5 h-3.5 bg-[var(--primary-400)] align-middle ml-0.5 animate-pulse" />
             </MarkdownBody>
           </div>

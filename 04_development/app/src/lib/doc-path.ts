@@ -30,3 +30,18 @@ export function rootLabelOf(source: string | undefined): string {
   if (source === 'custom') return '노트';
   return '작업 폴더';
 }
+
+/**
+ * 문서 안의 상대 링크(`./a.md`, `../b.md`)를 그 문서가 있는 폴더 기준 경로로 바꾼다 (FEAT-004).
+ * `./`·`../`로 시작하지 않으면 그대로 둔다 — 서버가 루트 기준·이름 검색으로 찾는다.
+ */
+export function joinDocPath(dir: string, ref: string): string {
+  if (!ref.startsWith('./') && !ref.startsWith('../')) return ref;
+  const parts = dir.split('/').filter(Boolean);
+  for (const seg of ref.split('/')) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') parts.pop();
+    else parts.push(seg);
+  }
+  return parts.join('/');
+}

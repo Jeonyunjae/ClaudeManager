@@ -276,6 +276,14 @@ body:has([data-mobile-shell]) {
 .chat-markdown ul, .chat-markdown ol { margin: 4px 0; padding-left: 18px; }
 .chat-markdown li { margin: 2px 0; }
 .chat-markdown strong { font-weight: 700; }
+/* FEAT-004: 링크(웹 주소·문서 참조)가 눌리는 것임을 알 수 있게 */
+.chat-markdown a {
+  color: var(--primary-600, #6D28D9);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+.chat-markdown a code { color: inherit; }
 .chat-markdown code {
   background: rgba(0, 0, 0, 0.06);
   padding: 1px 5px;

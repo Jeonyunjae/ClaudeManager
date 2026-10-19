@@ -15,6 +15,8 @@ import { agentManager } from '../lib/agent-manager';
 import { loadMainSkill, parseActions } from '../lib/skill-loader';
 import { createNotification } from '../lib/notify';
 import { broadcast } from './ws-server';
+import { InstanceTracker } from './instance-tracker';
+import { dbInstanceStore } from './instance-store';
 
 function ts() {
   const d = new Date();
@@ -183,6 +185,26 @@ export async function processChatInBackground(req: CliExecutionRequest): Promise
     await db.update(agents).set({ status: 'active', statusMessage: cliPrompt.length > 60 ? cliPrompt.substring(0, 60) + '…' : cliPrompt }).where(eq(agents.id, agentId));
   } catch {}
 
+  // BUG-034: Sub가 Agent 도구로 띄우는 Instance를 agents에 기록해 대시보드 Instance 열에 보인다.
+  // 기록은 순서대로(시작 insert → 종료 update) 처리해야 해서 하나의 줄에 세운다.
+  let instanceTracker: InstanceTracker | null = null;
+  let instanceQueue: Promise<void> = Promise.resolve();
+  const enqueueInstance = (fn: () => Promise<void>) => {
+    instanceQueue = instanceQueue.then(fn).catch(() => {});
+  };
+  try {
+    const [self] = await db.select().from(agents).where(eq(agents.id, agentId)).limit(1);
+    if (self?.role === 'sub') {
+      instanceTracker = new InstanceTracker(
+        { id: agentId, partId: self.partId ?? null, modelName: modelName ?? self.modelName ?? null },
+        { store: dbInstanceStore, broadcast: (event, payload) => broadcast(event, payload), newId: uuidv4, log: (m) => console.log(`[${ts()}] ${m}`) }
+      );
+    }
+  } catch {
+    /* Instance 기록 실패가 대화를 막으면 안 된다 */
+  }
+  let cliFailed = true;
+
   try {
     let streamedText = '';
     // 에이전트가 실행한 도구들. 응답 메시지의 metadata에 함께 저장해
@@ -202,8 +224,13 @@ export async function processChatInBackground(req: CliExecutionRequest): Promise
         const entry = { name: tool.name || 'tool', target: summarizeToolInput(tool.input) };
         toolsUsed.push(entry);
         broadcast('chat:tool', { agentId, responseMsgId, ...entry });
+        if (instanceTracker) enqueueInstance(() => instanceTracker!.onToolUse(tool));
+      },
+      (result) => {
+        if (instanceTracker) enqueueInstance(() => instanceTracker!.onToolResult(result));
       },
     );
+    cliFailed = false;
 
     // Parse actions from response
     const { actions, cleanText } = parseActions(cliResponse.text);
@@ -304,6 +331,12 @@ export async function processChatInBackground(req: CliExecutionRequest): Promise
       },
       { broadcast }
     );
+  } finally {
+    // 결과(tool_result)가 오지 않은 Instance를 닫는다 — Sub가 실패했으면 error, 아니면 중단
+    if (instanceTracker) {
+      enqueueInstance(() => instanceTracker!.finishAll(cliFailed));
+      await instanceQueue;
+    }
   }
 }
 

@@ -2,7 +2,7 @@
  * 모바일 문서 화면 경로 도우미 단위 테스트 — FEAT-003
  */
 import { describe, it, expect } from 'vitest';
-import { parentPath, breadcrumbs, docTitle, rootLabelOf } from '@/lib/doc-path';
+import { parentPath, breadcrumbs, docTitle, rootLabelOf, joinDocPath } from '@/lib/doc-path';
 
 describe('parentPath', () => {
   it.each([
@@ -43,5 +43,17 @@ describe('rootLabelOf', () => {
     expect(rootLabelOf('project')).toBe('작업 폴더');
     expect(rootLabelOf('custom')).toBe('노트');
     expect(rootLabelOf(undefined)).toBe('작업 폴더');
+  });
+});
+
+describe('joinDocPath (문서 안 상대 링크, FEAT-004)', () => {
+  it.each([
+    ['docs', './a.md', 'docs/a.md'],
+    ['docs/deploy', '../00-approvals.md', 'docs/00-approvals.md'],
+    ['', './a.md', 'a.md'],
+    ['docs', 'other/b.md', 'other/b.md'],
+    ['docs', 'b.md', 'b.md'],
+  ])('%s + %s → %s', (dir, ref, expected) => {
+    expect(joinDocPath(dir, ref)).toBe(expected);
   });
 });

@@ -48,4 +48,12 @@ describe('mobileDocsStore', () => {
     expect(useMobileDocsStore.getState().error).toBe('문서를 열지 못했습니다');
     expect(useMobileDocsStore.getState().loading).toBe(false);
   });
+
+  it('resolveRef: 참조 후보를 기억한다 (FEAT-004)', async () => {
+    mockGet.mockResolvedValue({ data: { ref: 'a.md', matches: ['docs/a.md', 'x/a.md'] } });
+    const { useMobileDocsStore } = await import('@/stores/mobileDocsStore');
+    await useMobileDocsStore.getState().resolveRef('a1', 'a.md');
+    expect(mockGet).toHaveBeenCalledWith('/api/agents/a1/notes?resolve=a.md');
+    expect(useMobileDocsStore.getState().resolved).toEqual({ agentId: 'a1', ref: 'a.md', matches: ['docs/a.md', 'x/a.md'] });
+  });
 });

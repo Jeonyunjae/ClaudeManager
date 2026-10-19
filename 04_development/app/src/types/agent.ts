@@ -28,6 +28,10 @@ export type AgentTreeNode = {
   status: AgentStatus;
   statusMessage?: string;
   partId?: string;
+  /** BUG-034: Instance 카드 표시용 (모델, 시작·종료 시각) */
+  modelName?: string;
+  startedAt?: string;
+  stoppedAt?: string;
   children: AgentTreeNode[];
 };
 

@@ -10,6 +10,7 @@ import { useAgentDetailStore } from '@/stores/agentDetailStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { apiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { instanceSubtitle, sortInstances } from '@/lib/instance-view';
 import {
   StatusDot,
   MainAgentCard,
@@ -252,9 +253,18 @@ export function WorkspaceLayout() {
   const filteredSubs = selectedPartId
     ? subs.filter((s) => s.partId === selectedPartId)
     : subs;
+  // BUG-034: 진행 중 먼저, 그다음 최근 완료 순으로 최대 20건
   const filteredInstances = selectedSubId
-    ? getInstancesForSub(tree, selectedSubId)
+    ? sortInstances(getInstancesForSub(tree, selectedSubId))
     : [];
+  // 진행 중 Instance가 있으면 경과 시간이 흐르도록 5초마다 다시 그린다
+  const hasActiveInstance = filteredInstances.some((i) => i.status === 'active');
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    if (!hasActiveInstance) return;
+    const timer = setInterval(() => setClock(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, [hasActiveInstance]);
 
   // Get color for selected part
   const getPartColor = (partId: string, index: number) => {
@@ -450,11 +460,11 @@ export function WorkspaceLayout() {
                 <AgentCardShared
                   key={inst.id}
                   name={inst.name}
-                  subtitle={inst.statusMessage || inst.role}
+                  subtitle={instanceSubtitle(inst, clock)}
                   status={inst.status}
                   color={partColor}
                   isInstance
-                  modelName="claude-sonnet"
+                  modelName={inst.modelName ?? 'claude'}
                   onClick={() => setSelectedAgentId(inst.id)}
                   onDoubleClick={() => openAgent(inst.id)}
                 />

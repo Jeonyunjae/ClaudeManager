@@ -20,15 +20,17 @@ export function useWebSocket(): void {
     // Agent events
     unsubscribers.push(
       wsClient.on('agent:status', (payload) => {
-        const data = payload as { agentId: string; status: string; statusMessage?: string };
-        useAgentStore.getState().updateAgentStatus(data.agentId, data.status, data.statusMessage);
+        const data = payload as { agentId: string; status: string; statusMessage?: string; stoppedAt?: string };
+        useAgentStore.getState().updateAgentStatus(data.agentId, data.status, data.statusMessage, data.stoppedAt);
       })
     );
 
     unsubscribers.push(
       wsClient.on('agent:created', (payload) => {
-        const data = payload as { agent: import('@/types/agent').AgentTreeNode };
-        useAgentStore.getState().addAgent(data.agent);
+        // 두 가지 모양이 온다: { agent, parentId } (Instance, BUG-034) / { agent } (Sub 생성 등)
+        const data = payload as { agent?: import('@/types/agent').AgentTreeNode; parentId?: string };
+        if (data.agent) useAgentStore.getState().addAgent({ ...data.agent, children: data.agent.children ?? [] }, data.parentId);
+        else void useAgentStore.getState().fetchTree(); // 평평한 모양(Sub 생성 액션)은 트리를 다시 받는다
       })
     );
 

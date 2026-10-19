@@ -90,6 +90,15 @@ export async function register() {
       return { sessionId: agent?.cliSessionId || null, projectRoot: agent?.projectRoot || null };
     });
 
+    // BUG-034: 서버가 꺼질 때 실행 중이던 Instance가 'active'로 남지 않게 닫는다 (자기 DB만 건드린다)
+    try {
+      const { closeStaleInstances } = await import('@/server/instance-store');
+      const closed = await closeStaleInstances();
+      if (closed > 0) console.log(`[Boot] 중단된 Instance ${closed}건을 닫았다.`);
+    } catch (e) {
+      console.error('[Boot] Instance 정리 실패:', e);
+    }
+
     if (!backgroundJobsEnabled(process.env)) {
       // 테스트 인스턴스(claudemanager-mtest): 백업·리포트·키 만료·Main 재개·파일 감시를
       // 건너뛴다. 운영 DB에 쓰지 않기 위함이다 (NFR-002).

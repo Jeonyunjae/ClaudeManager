@@ -18,7 +18,8 @@ function updateStatusInTree(
   nodes: AgentTreeNode[],
   agentId: string,
   status: string,
-  statusMessage?: string
+  statusMessage?: string,
+  stoppedAt?: string
 ): AgentTreeNode[] {
   return nodes.map((node) => {
     if (node.id === agentId) {
@@ -26,13 +27,30 @@ function updateStatusInTree(
         ...node,
         status: status as AgentTreeNode['status'],
         statusMessage: statusMessage ?? node.statusMessage,
+        stoppedAt: stoppedAt ?? node.stoppedAt,
       };
     }
     return {
       ...node,
-      children: updateStatusInTree(node.children, agentId, status, statusMessage),
+      children: updateStatusInTree(node.children, agentId, status, statusMessage, stoppedAt),
     };
   });
+}
+
+/** BUG-034: 새 에이전트를 부모 아래에 붙인다. 부모가 트리에 없으면 최상위에 둔다 */
+export function insertIntoTree(nodes: AgentTreeNode[], agent: AgentTreeNode, parentId?: string): AgentTreeNode[] {
+  if (!parentId) return [...nodes, agent];
+  let placed = false;
+  const walk = (list: AgentTreeNode[]): AgentTreeNode[] =>
+    list.map((node) => {
+      if (node.id === parentId) {
+        placed = true;
+        return { ...node, children: [...node.children.filter((c) => c.id !== agent.id), agent] };
+      }
+      return { ...node, children: walk(node.children) };
+    });
+  const next = walk(nodes);
+  return placed ? next : [...nodes, agent];
 }
 
 type AgentState = {
@@ -44,8 +62,8 @@ type AgentState = {
   error: string | null;
   fetchTree: () => Promise<void>;
   initMain: () => Promise<void>;
-  updateAgentStatus: (agentId: string, status: string, statusMessage?: string) => void;
-  addAgent: (agent: AgentTreeNode) => void;
+  updateAgentStatus: (agentId: string, status: string, statusMessage?: string, stoppedAt?: string) => void;
+  addAgent: (agent: AgentTreeNode, parentId?: string) => void;
   removeAgent: (agentId: string) => void;
   getAgent: (id: string) => AgentTreeNode | undefined;
 };
@@ -83,15 +101,15 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     }
   },
 
-  updateAgentStatus: (agentId, status, statusMessage) => {
+  updateAgentStatus: (agentId, status, statusMessage, stoppedAt) => {
     const { tree } = get();
-    const newTree = updateStatusInTree(tree, agentId, status, statusMessage);
+    const newTree = updateStatusInTree(tree, agentId, status, statusMessage, stoppedAt);
     set({ tree: newTree, agents: flattenTree(newTree) });
   },
 
-  addAgent: (agent) => {
+  addAgent: (agent, parentId) => {
     set((state) => {
-      const newTree = [...state.tree, agent];
+      const newTree = insertIntoTree(state.tree, agent, parentId);
       return { tree: newTree, agents: flattenTree(newTree) };
     });
   },

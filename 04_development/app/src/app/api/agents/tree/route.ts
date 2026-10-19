@@ -3,6 +3,7 @@ import db from '@/lib/db';
 import { agents } from '@/lib/schema';
 import { getAuthenticatedUserId } from '@/lib/auth';
 import type { AgentTreeNode } from '@/types/agent';
+import { isInstanceVisible } from '@/lib/instance-view';
 
 export async function GET(request: NextRequest) {
   const userId = getAuthenticatedUserId(request);
@@ -14,7 +15,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const allAgents = await db.select().from(agents);
+    // BUG-034: 끝난 지 하루가 지난 Instance는 트리에서 뺀다 (이력은 DB에 남는다)
+    const now = Date.now();
+    const allAgents = (await db.select().from(agents)).filter((a) => isInstanceVisible(a, now));
 
     // Build tree from flat list
     const nodeMap = new Map<string, AgentTreeNode>();
@@ -26,6 +29,9 @@ export async function GET(request: NextRequest) {
         status: agent.status as AgentTreeNode['status'],
         statusMessage: agent.statusMessage ?? undefined,
         partId: agent.partId ?? undefined,
+        modelName: agent.modelName ?? undefined,
+        startedAt: agent.startedAt ?? undefined,
+        stoppedAt: agent.stoppedAt ?? undefined,
         children: [],
       });
     }

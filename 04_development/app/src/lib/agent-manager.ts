@@ -20,6 +20,17 @@ function ts() {
 export interface ToolUseEvent {
   name?: string;
   input?: unknown;
+  /** stream-json tool_use 블록 id — 결과(tool_result)와 짝을 맞춘다 (BUG-034) */
+  id?: string;
+  /** Instance(하위 에이전트) 안에서 실행된 도구면 그 Instance를 띄운 tool_use id */
+  parentToolUseId?: string | null;
+}
+
+/** 도구 실행 결과 (BUG-034) — Instance 종료 감지에 쓴다 */
+export interface ToolResultEvent {
+  toolUseId: string;
+  isError: boolean;
+  parentToolUseId?: string | null;
 }
 
 export interface CLIResult {
@@ -157,7 +168,7 @@ class AgentManager extends EventEmitter {
   /**
    * Send a message to an agent and get the response (streaming).
    */
-  async sendMessage(agentId: string, content: string, systemPrompt?: string, modelName?: string, onStream?: (text: string) => void, onToolUse?: (tool: ToolUseEvent) => void): Promise<{ text: string; costUsd: number; inputTokens: number; outputTokens: number; durationMs: number; modelName: string }> {
+  async sendMessage(agentId: string, content: string, systemPrompt?: string, modelName?: string, onStream?: (text: string) => void, onToolUse?: (tool: ToolUseEvent) => void, onToolResult?: (result: ToolResultEvent) => void): Promise<{ text: string; costUsd: number; inputTokens: number; outputTokens: number; durationMs: number; modelName: string }> {
     let session = this.sessions.get(agentId);
     let projectRoot: string | undefined;
 
@@ -199,6 +210,7 @@ class AgentManager extends EventEmitter {
         model,
         onStream,
         onToolUse,
+        onToolResult,
       });
 
       session.sessionId = result.session_id;
@@ -258,6 +270,7 @@ class AgentManager extends EventEmitter {
     model?: string;
     onStream?: (text: string) => void;
     onToolUse?: (tool: ToolUseEvent) => void;
+    onToolResult?: (result: ToolResultEvent) => void;
   }): Promise<CLIResult> {
     return new Promise((resolve, reject) => {
       const agentProjectRoot = options.projectRoot || process.env.PROJECT_ROOT || '';
@@ -349,8 +362,18 @@ class AgentManager extends EventEmitter {
                 if (options.onToolUse) {
                   for (const b of blocks) {
                     if (b?.type === 'tool_use') {
-                      options.onToolUse({ name: b.name, input: b.input });
+                      options.onToolUse({ name: b.name, input: b.input, id: b.id, parentToolUseId: event.parent_tool_use_id ?? null });
                     }
+                  }
+                }
+              }
+            } else if (event.type === 'user') {
+              // 도구 결과 — Instance(Agent 도구)가 끝났는지 알 수 있는 유일한 신호다 (BUG-034)
+              const blocks = event.message?.content;
+              if (options.onToolResult && Array.isArray(blocks)) {
+                for (const b of blocks) {
+                  if (b?.type === 'tool_result' && typeof b.tool_use_id === 'string') {
+                    options.onToolResult({ toolUseId: b.tool_use_id, isError: !!b.is_error, parentToolUseId: event.parent_tool_use_id ?? null });
                   }
                 }
               }

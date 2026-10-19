@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { decideEnterAction } from '@/lib/composer-keys';
+import { useEnterToSend } from '@/hooks/useEnterToSend';
 import { MAX_CHAT_ATTACHMENTS } from '@/lib/constants';
 import type { ChatAttachment } from '@/stores/mobileChatStore';
 
@@ -84,9 +84,9 @@ export function MessageComposer({ sending, onSend, onUpload }: MessageComposerPr
     setValue(e.target.value);
   }
 
-  async function handleSubmit(): Promise<void> {
-    if (!canSend) return;
-    const content = value;
+  async function handleSubmit(textOverride?: string): Promise<void> {
+    const content = textOverride ?? value;
+    if ((content.trim().length < 1 && ready.length === 0) || sending || uploading) return;
     const sent = images;
     setValue(''); // EVT-M02-2: 입력창 비움 (전송 시도와 동시에 즉시)
     setImages([]);
@@ -103,24 +103,8 @@ export function MessageComposer({ sending, onSend, onUpload }: MessageComposerPr
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
-    if (e.key !== 'Enter' || e.shiftKey) return;
-
-    // BUG-010: IME(한글 등) 조합 중 Enter, 터치 기기의 Enter는 전송하지 않는다.
-    const isCoarsePointer =
-      typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-    const action = decideEnterAction({
-      isComposing: e.nativeEvent.isComposing,
-      keyCode: e.keyCode,
-      isCoarsePointer,
-    });
-
-    if (action === 'send') {
-      e.preventDefault();
-      handleSubmit();
-    }
-    // action === 'default': 조합 확정(IME) 또는 줄바꿈(터치 기기)에 기본 동작을 맡긴다.
-  }
+  // BUG-033·BUG-010: 한글 조합 중 Enter → 조합이 끝나는 순간 1회 전송. 터치 기기는 Enter = 줄바꿈
+  const enter = useEnterToSend((text) => void handleSubmit(text), { coarsePointerNewline: true });
 
   return (
     <div
@@ -190,18 +174,23 @@ export function MessageComposer({ sending, onSend, onUpload }: MessageComposerPr
           </svg>
         </button>
         <textarea
-          ref={textareaRef}
+          ref={(el) => {
+            textareaRef.current = el;
+            enter.setElement(el);
+          }}
           rows={MIN_ROWS}
           value={value}
           onChange={handleChange}
-          onKeyDown={handleKeyDown}
+          onKeyDown={enter.onKeyDown}
+          onCompositionStart={enter.onCompositionStart}
+          onCompositionEnd={enter.onCompositionEnd}
           placeholder="메시지 입력…"
           aria-label="메시지 입력"
           className="flex-1 resize-none rounded-[var(--radius-lg)] border border-[var(--primary-100)] px-3 py-2 text-base text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-300)]"
         />
         <button
           type="button"
-          onClick={handleSubmit}
+          onClick={() => void handleSubmit()}
           disabled={!canSend}
           aria-label={sending ? '전송 중' : '전송'}
           className={cn(

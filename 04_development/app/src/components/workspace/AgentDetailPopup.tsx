@@ -7,6 +7,7 @@ import { docRefFromHref, isExternalHref, isWholeDocRef, remarkDocRefs } from '@/
 import { joinDocPath, parentPath } from '@/lib/doc-path';
 import { Rnd } from 'react-rnd';
 import type { AgentConversation } from '@/types/agent';
+import { useEnterToSend } from '@/hooks/useEnterToSend';
 import { useAgentDetailStore } from '@/stores/agentDetailStore';
 import { useAgentStore } from '@/stores/agentStore';
 import { apiClient } from '@/lib/api';
@@ -815,10 +816,11 @@ function ChatTab() {
     });
   };
 
-  const handleSend = () => {
+  const handleSend = (textOverride?: string) => {
     // 답변 중에도 보낼 수 있다 — 서버 대기열이 순서를 지켜 처리한다.
-    if ((!inputValue.trim() && attachedFiles.length === 0) || !selectedAgent) return;
-    const msg = inputValue.trim() || (attachedFiles.length > 0 ? '첨부 파일을 분석해주세요.' : '');
+    const text = textOverride ?? inputValue;
+    if ((!text.trim() && attachedFiles.length === 0) || !selectedAgent) return;
+    const msg = text.trim() || (attachedFiles.length > 0 ? '첨부 파일을 분석해주세요.' : '');
     sendMessage(selectedAgent.id, msg, attachedFiles.length > 0 ? attachedFiles : undefined);
     setInputValue('');
     setAttachedFiles([]);
@@ -876,12 +878,8 @@ function ChatTab() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+  // BUG-033: 한글 조합 중 Enter → 조합이 끝나는 순간 1회 전송 (브라우저별 순서 차이 흡수)
+  const enter = useEnterToSend((text) => handleSend(text));
 
   return (
     <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -996,13 +994,16 @@ function ChatTab() {
           transition: 'border-color .15s, box-shadow .15s',
         }}>
           <textarea
+            ref={enter.setElement}
             value={inputValue}
             onChange={(e) => {
               setInputValue(e.target.value);
               e.target.style.height = 'auto';
               e.target.style.height = Math.min(e.target.scrollHeight, 168) + 'px';
             }}
-            onKeyDown={handleKeyDown}
+            onKeyDown={enter.onKeyDown}
+            onCompositionStart={enter.onCompositionStart}
+            onCompositionEnd={enter.onCompositionEnd}
             onPaste={handlePaste}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
@@ -1054,7 +1055,7 @@ function ChatTab() {
             </button>
           ) : (
             <button
-              onClick={handleSend}
+              onClick={() => handleSend()}
               disabled={!inputValue.trim() && attachedFiles.length === 0}
               style={{
                 position: 'absolute', right: 8, bottom: 7,

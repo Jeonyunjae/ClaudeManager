@@ -4,6 +4,10 @@ import { create } from 'zustand';
 import type { ChatMessage } from '@/types/chat';
 import apiClient from '@/lib/api';
 import wsClient from '@/lib/ws';
+import { createSendDeduper } from '@/lib/enter-send';
+
+/** BUG-033 보조 안전장치 — 같은 내용 1초 안 재전송 차단 */
+const isDuplicateSend = createSendDeduper();
 
 type ChatState = {
   messages: ChatMessage[];
@@ -13,7 +17,8 @@ type ChatState = {
   hasMore: boolean;
   page: number;
   setInput: (input: string) => void;
-  sendMessage: () => Promise<void>;
+  /** content를 주면 그 값을 보낸다 (BUG-033: 조합 끝 직후 DOM 값) */
+  sendMessage: (content?: string) => Promise<void>;
   loadMessages: (page?: number) => Promise<void>;
   loadMore: () => Promise<void>;
   addMessage: (message: ChatMessage) => void;
@@ -30,9 +35,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setInput: (input) => set({ input }),
 
-  sendMessage: async () => {
-    const { input } = get();
+  sendMessage: async (content) => {
+    const input = content ?? get().input;
     if (!input.trim()) return;
+    if (isDuplicateSend('main', input.trim())) return;
 
     set({ input: '' });
 

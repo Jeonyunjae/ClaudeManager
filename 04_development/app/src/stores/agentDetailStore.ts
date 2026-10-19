@@ -3,6 +3,9 @@
 import { create } from 'zustand';
 import type { AgentDetail, AgentConversation, AgentNote, AgentLog } from '@/types/agent';
 import apiClient from '@/lib/api';
+import { createSendDeduper } from '@/lib/enter-send';
+
+const isDuplicateSend = createSendDeduper();
 
 type ActiveTab = 'info' | 'cli' | 'chat' | 'log' | 'note';
 
@@ -322,6 +325,8 @@ export const useAgentDetailStore = create<AgentDetailState>((set, get) => ({
   sendMessage: async (agentId, content, attachments) => {
     // 답변 중이어도 막지 않는다. 서버 대기열이 순서를 지켜 처리한다.
     if (!content.trim()) return;
+    // BUG-033 보조 안전장치 — 같은 에이전트에 같은 내용 1초 안 재전송 차단
+    if (isDuplicateSend(agentId, content.trim())) return;
     const newSending = new Set(get().sendingAgents);
     newSending.add(agentId);
     set({ isSending: true, sendingAgents: newSending });

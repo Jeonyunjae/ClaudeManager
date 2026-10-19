@@ -2,7 +2,7 @@
 
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { baseRemarkPlugins } from '@/lib/markdown-plugins';
 import type { ChatMessage } from '@/types/chat';
 import { formatRelativeTime } from '@/lib/utils';
 
@@ -22,7 +22,7 @@ export function MainMessage({ message }: MainMessageProps) {
           <p className="text-[10px] text-[var(--text-tertiary)] mb-0.5">비서실장</p>
           <div className="bg-white border border-[var(--primary-50)] px-4 py-2.5 rounded-[var(--radius-2xl)] rounded-bl-[var(--radius-sm)] shadow-[var(--shadow-sm)]">
             <div className="text-sm prose prose-sm max-w-none text-[var(--text-primary)]">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown remarkPlugins={baseRemarkPlugins}>
                 {message.content}
               </ReactMarkdown>
             </div>

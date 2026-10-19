@@ -3,6 +3,7 @@
 import React from 'react';
 import { useAgentStore } from '@/stores/agentStore';
 import { useSystemStore } from '@/stores/systemStore';
+import { formatBuildLabel, getBuildInfo } from '@/lib/build-info';
 
 export function BottomBar() {
   const { agents } = useAgentStore();
@@ -20,7 +21,9 @@ export function BottomBar() {
       fontSize: 11, color: '#9CA3AF',
       position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 99,
     }}>
-      <span>YJ Manager v1.0 &middot; Connected</span>
+      <span title={getBuildInfo().commitTime || undefined}>
+        {`YJ Manager · ${formatBuildLabel(getBuildInfo())} · Connected`}
+      </span>
       <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { baseRemarkPlugins } from '@/lib/markdown-plugins';
 import { docRefFromHref, isExternalHref, isWholeDocRef, remarkDocRefs } from '@/lib/doc-refs';
 import { joinDocPath, parentPath } from '@/lib/doc-path';
 import { Rnd } from 'react-rnd';
@@ -650,7 +650,7 @@ const ConversationItem = React.memo(function ConversationItem({
     <div key={c.id} style={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column' }}>
       {tools.length > 0 && <ToolTrace tools={tools} />}
       <div className="chat-markdown" style={{ fontSize: '12px', lineHeight: 1.7, color: T.textPrimary, padding: '2px 2px 0' }}>
-        <ReactMarkdown remarkPlugins={[remarkGfm, remarkDocRefs]} components={markdownLinkComponents(onOpenDocRef)}>
+        <ReactMarkdown remarkPlugins={[...baseRemarkPlugins, remarkDocRefs]} components={markdownLinkComponents(onOpenDocRef)}>
           {c.content}
         </ReactMarkdown>
       </div>
@@ -1551,7 +1551,7 @@ function NoteTab() {
               }}
             >
               <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkDocRefs]}
+                remarkPlugins={[...baseRemarkPlugins, remarkDocRefs]}
                 components={markdownLinkComponents((r) => openNoteRef(agentId, joinDocPath(parentPath(selectedNoteContent.file), r)))}
               >
                 {selectedNoteContent.content}

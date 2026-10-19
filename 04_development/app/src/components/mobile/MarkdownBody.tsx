@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { baseRemarkPlugins } from '@/lib/markdown-plugins';
 import { cn } from '@/lib/utils';
 import { docRefFromHref, isExternalHref, isWholeDocRef, remarkDocRefs } from '@/lib/doc-refs';
 
@@ -28,7 +28,7 @@ export function MarkdownBody({
   return (
     <div className={cn('chat-markdown min-w-0 text-sm text-[var(--text-primary)] [overflow-wrap:anywhere]', className)}>
       <ReactMarkdown
-        remarkPlugins={docHref ? [remarkGfm, remarkDocRefs] : [remarkGfm]}
+        remarkPlugins={docHref ? [...baseRemarkPlugins, remarkDocRefs] : baseRemarkPlugins}
         components={{
           table: ({ node: _node, ...props }) => (
             <div className="overflow-x-auto">

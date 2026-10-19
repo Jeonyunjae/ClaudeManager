@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useViewMode } from '@/hooks/useViewMode';
 import { agentRoleLabel, agentStatusLabel } from '@/lib/mobile-format';
 import type { AgentTreeNode } from '@/types/agent';
+import { formatBuildLabel, getBuildInfo } from '@/lib/build-info';
 
 function statusDotClass(status: string): string {
   switch (status) {
@@ -135,6 +136,8 @@ export default function MobileStatusPage() {
               로그아웃
             </button>
           </div>
+          {/* FEAT-005: 지금 돌고 있는 코드 버전 */}
+          <p className="text-[11px] text-[var(--text-tertiary)]">{formatBuildLabel(getBuildInfo())}</p>
         </div>
       </div>
     </div>

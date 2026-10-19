@@ -2,7 +2,7 @@
 
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { baseRemarkPlugins } from '@/lib/markdown-plugins';
 
 interface NoteRendererProps {
   content: string;
@@ -13,7 +13,7 @@ export function NoteRenderer({ content, className }: NoteRendererProps) {
   return (
     <div className={`prose prose-sm max-w-none ${className || ''}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={baseRemarkPlugins}
         components={{
           h1: ({ children }) => (
             <h1 className="text-xl font-bold text-[var(--text-primary)] mb-4 pb-2 border-b border-[var(--primary-50)]">{children}</h1>
